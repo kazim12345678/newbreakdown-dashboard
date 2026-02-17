@@ -1,11 +1,9 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 
-st.set_page_config(page_title="NADEC Breakdown Dashboard", layout="wide")
+st.set_page_config(page_title="NADEC Maintenance KPIs", layout="wide")
 
-# -----------------------------------------
-# HEADER
-# -----------------------------------------
 st.markdown("""
 <div style='background:#003366; padding:15px; text-align:center; color:white; 
             font-size:22px; border-radius:6px;'>
@@ -15,117 +13,100 @@ st.markdown("""
 
 st.write("")
 
-# -----------------------------------------
-# SESSION STATE DATA
-# -----------------------------------------
-if "data" not in st.session_state:
-    st.session_state.data = pd.DataFrame(
-        columns=["Date", "Machine", "Time", "Reason", "Technician"]
+# ---------------- Session data ----------------
+if "bd" not in st.session_state:
+    st.session_state.bd = pd.DataFrame(
+        columns=["DateTime", "Machine", "Minutes", "Reason", "Technician", "Notes"]
     )
 
-df = st.session_state.data
+df = st.session_state.bd
 
-# -----------------------------------------
-# BUTTONS
-# -----------------------------------------
-colA, colB, colC = st.columns([1,1,1])
-
-with colA:
-    upload = st.file_uploader("📂 Upload CSV", type=["csv"])
-
-    if upload:
-        st.session_state.data = pd.read_csv(upload)
-        st.success("CSV Loaded Successfully!")
-
-with colB:
-    add_form = st.button("➕ Add Breakdown Entry", use_container_width=True)
-
-with colC:
-    st.download_button(
-        "📥 Export Updated CSV",
-        df.to_csv(index=False),
-        file_name="breakdown_data.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
-
-# -----------------------------------------
-# ADD ENTRY FORM
-# -----------------------------------------
-if add_form:
-    with st.form("entry_form", clear_on_submit=True):
-        st.subheader("Add Breakdown Entry")
-
-        c1, c2 = st.columns(2)
-        with c1:
-            date = st.date_input("Date")
-            machine = st.selectbox("Machine", [f"M{i}" for i in range(1,19)])
-            time = st.number_input("Time (minutes)", min_value=1)
-
-        with c2:
-            reason = st.selectbox("Reason", ["Mechanical", "Electrical", "Automation"])
-            tech = st.text_input("Technician")
-
-        submitted = st.form_submit_button("Save Entry")
-
-        if submitted:
-            new_row = pd.DataFrame(
-                [[str(date), machine, time, reason, tech]],
+# ---------------- Entry form ----------------
+with st.expander("➕ Add Breakdown Event", expanded=False):
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        machine = st.selectbox("Machine", [f"M{i}" for i in range(1,19)])
+        minutes = st.number_input("Downtime (minutes)", min_value=1)
+    with c2:
+        reason = st.selectbox("Reason", ["Mechanical", "Electrical", "Automation", "Other"])
+        tech = st.text_input("Technician")
+    with c3:
+        notes = st.text_area("Notes / Root Cause / Action", height=80)
+        if st.button("Save Breakdown"):
+            new = pd.DataFrame(
+                [[datetime.now(), machine, minutes, reason, tech, notes]],
                 columns=df.columns
             )
-            st.session_state.data = pd.concat([df, new_row], ignore_index=True)
-            st.success("Entry Added Successfully!")
+            st.session_state.bd = pd.concat([df, new], ignore_index=True)
+            st.success("Breakdown saved.")
 
-df = st.session_state.data
+df = st.session_state.bd
 
-# -----------------------------------------
-# BREAKDOWN TABLE (WITH EDIT + DELETE)
-# -----------------------------------------
-st.subheader("📋 Breakdown Log")
-
-if len(df) > 0:
-    edited_df = st.data_editor(df, num_rows="dynamic")
-    st.session_state.data = edited_df
-else:
-    st.info("No breakdown data yet.")
-
-# -----------------------------------------
-# TIMELINE VIEW (CUTE BAR STYLE)
-# -----------------------------------------
-st.subheader("📊 Machine Breakdown Timeline (Cute View)")
+# ---------------- KPIs ----------------
+st.subheader("📊 High-Level KPIs (Today)")
 
 if len(df) == 0:
-    st.info("Add entries to see timeline.")
+    st.info("No breakdowns recorded yet.")
 else:
-    machines = df["Machine"].unique()
+    total_minutes = df["Minutes"].sum()
+    worst_machine = df.groupby("Machine")["Minutes"].sum().idxmax()
+    common_reason = df["Reason"].value_counts().idxmax()
 
+    k1, k2, k3 = st.columns(3)
+    k1.metric("Total Breakdown Minutes", total_minutes)
+    k2.metric("Worst Machine", worst_machine)
+    k3.metric("Most Common Reason", common_reason)
+
+# ---------------- Machine table ----------------
+st.subheader("🧾 Machine Breakdown Summary")
+
+if len(df) > 0:
+    summary = df.groupby("Machine")["Minutes"].sum().reset_index()
+    summary = summary.sort_values("Minutes", ascending=False)
+    st.dataframe(summary, use_container_width=True)
+else:
+    st.info("No data to summarize yet.")
+
+# ---------------- Timeline-style bars ----------------
+st.subheader("📍 Breakdown Bars by Machine")
+
+if len(df) > 0:
+    machines = df["Machine"].unique()
     for m in machines:
         st.markdown(f"### {m}")
-
         row = df[df["Machine"] == m]
 
         bar_html = ""
-
         for _, r in row.iterrows():
             color = {
                 "Mechanical": "red",
                 "Electrical": "blue",
-                "Automation": "green"
+                "Automation": "green",
+                "Other": "gray"
             }[r["Reason"]]
-
-            width = min(int(r["Time"]) * 2, 300)  # scaling for beauty
+            width = min(int(r["Minutes"]) * 2, 300)
 
             bar_html += f"""
-            <div title="Reason: {r['Reason']} | Time: {r['Time']} min | Tech: {r['Technician']}"
-                 style="
-                    display:inline-block;
-                    width:{width}px;
-                    height:18px;
-                    background:{color};
-                    border-radius:6px;
-                    margin-right:4px;
-                    cursor:pointer;">
+            <div style="
+                display:inline-block;
+                width:{width}px;
+                height:18px;
+                background:{color};
+                border-radius:6px;
+                margin-right:4px;
+                cursor:pointer;"
+                title="Reason: {r['Reason']} | {r['Minutes']} min | Tech: {r['Technician']} | {r['Notes']}">
             </div>
             """
 
-        st.markdown(f"<div>{bar_html}</div>", unsafe_allow_html=True)
+        st.markdown(bar_html, unsafe_allow_html=True)
+
+# ---------------- Export ----------------
+st.subheader("📤 Export Data")
+
+st.download_button(
+    "Download CSV",
+    df.to_csv(index=False),
+    file_name="maintenance_breakdowns.csv",
+    mime="text/csv"
+)
