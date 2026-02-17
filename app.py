@@ -1,276 +1,93 @@
-<!-- ===================================== -->
-<!-- REAL-TIME CUTE BREAKDOWN ENTRY SYSTEM -->
-<!-- ===================================== -->
+import streamlit as st
+import pandas as pd
 
-<div style="
-  margin-top:50px;
-  background:white;
-  padding:25px;
-  border-radius:18px;
-  box-shadow:0 4px 14px rgba(0,0,0,0.15);
-">
+st.set_page_config(page_title="Breakdown Dashboard", layout="wide")
 
-  <h2 style="color:#003366; text-align:center;">
-    🛠 Live Breakdown Entry + Machine Tracker (M1–M18)
-  </h2>
+st.title("🛠 Live Breakdown Entry + Machine Tracker (M1–M18)")
 
-  <p style="text-align:center; color:gray; font-size:14px;">
-    Add breakdown events daily. Click any machine tile to view total downtime minutes.
-    Data saves automatically inside browser (GitHub Pages Ready).
-  </p>
+# -----------------------------------------
+# Load or initialize data
+# -----------------------------------------
+if "breakdowns" not in st.session_state:
+    st.session_state.breakdowns = pd.DataFrame(
+        columns=["Date", "Machine", "Minutes", "Reason"]
+    )
 
-  <!-- Button Controls -->
-  <div style="text-align:center; margin-top:15px;">
-    <button onclick="toggleBreakdownForm()" style="
-      background:#003366;
-      color:white;
-      border:none;
-      padding:10px 18px;
-      border-radius:12px;
-      cursor:pointer;
-      font-size:14px;
-      margin:6px;
-    ">
-      ➕ Add Breakdown Entry
-    </button>
+df = st.session_state.breakdowns
 
-    <button onclick="exportBreakdownCSV()" style="
-      background:#198754;
-      color:white;
-      border:none;
-      padding:10px 18px;
-      border-radius:12px;
-      cursor:pointer;
-      font-size:14px;
-      margin:6px;
-    ">
-      ⬇ Export CSV Report
-    </button>
-  </div>
+# -----------------------------------------
+# Breakdown Entry Form
+# -----------------------------------------
+with st.expander("➕ Add Breakdown Entry", expanded=False):
+    col1, col2 = st.columns(2)
 
-  <!-- Hidden Form -->
-  <div id="breakdownFormBox" style="
-    display:none;
-    margin-top:20px;
-    padding:18px;
-    border-radius:15px;
-    background:#f8f9ff;
-    max-width:600px;
-    margin-left:auto;
-    margin-right:auto;
-  ">
+    with col1:
+        date = st.date_input("Date")
+        machine = st.selectbox("Machine", [f"M{i}" for i in range(1, 18+1)])
 
-    <h3 style="text-align:center; color:#003366;">
-      Breakdown Data Entry Form
-    </h3>
+    with col2:
+        minutes = st.number_input("Downtime Minutes", min_value=1, step=1)
+        reason = st.selectbox(
+            "Reason",
+            ["Mechanical", "Electrical", "Automation", "Operator Error"]
+        )
 
-    <label>Date:</label>
-    <input type="date" id="bDate" style="width:100%; padding:8px; margin:6px 0;">
+    if st.button("✅ Save Breakdown Entry"):
+        new_row = pd.DataFrame(
+            [[str(date), machine, minutes, reason]],
+            columns=df.columns
+        )
+        st.session_state.breakdowns = pd.concat([df, new_row], ignore_index=True)
+        st.success("Breakdown entry saved!")
 
-    <label>Machine:</label>
-    <select id="bMachine" style="width:100%; padding:8px; margin:6px 0;">
-      <option>M1</option><option>M2</option><option>M3</option><option>M4</option>
-      <option>M5</option><option>M6</option><option>M7</option><option>M8</option>
-      <option>M9</option><option>M10</option><option>M11</option><option>M12</option>
-      <option>M13</option><option>M14</option><option>M15</option><option>M16</option>
-      <option>M17</option><option>M18</option>
-    </select>
+df = st.session_state.breakdowns
 
-    <label>Downtime Minutes:</label>
-    <input type="number" id="bTime" placeholder="Enter minutes"
-      style="width:100%; padding:8px; margin:6px 0;">
+# -----------------------------------------
+# Machine Tiles (M1–M18)
+# -----------------------------------------
+st.subheader("📊 Machine Downtime Tiles (Click Any Machine)")
 
-    <label>Reason:</label>
-    <select id="bReason" style="width:100%; padding:8px; margin:6px 0;">
-      <option>Mechanical</option>
-      <option>Electrical</option>
-      <option>Automation</option>
-      <option>Operator Error</option>
-    </select>
+tile_cols = st.columns(6)
 
-    <button onclick="saveBreakdownEntry()" style="
-      width:100%;
-      margin-top:10px;
-      background:#003366;
-      color:white;
-      border:none;
-      padding:10px;
-      border-radius:12px;
-      cursor:pointer;
-    ">
-      ✅ Save Breakdown Entry
-    </button>
+for i in range(1, 19):
+    m = f"M{i}"
+    total = df[df["Machine"] == m]["Minutes"].sum()
 
-  </div>
+    with tile_cols[(i-1) % 6]:
+        if st.button(f"{m}\n{total} min", key=f"tile_{m}"):
+            st.session_state.selected_machine = m
 
-  <!-- Machine Tiles -->
-  <h3 style="text-align:center; margin-top:35px; color:#003366;">
-    Machine Downtime Tiles (Click Any Machine)
-  </h3>
+# -----------------------------------------
+# Machine Popup (Streamlit Modal)
+# -----------------------------------------
+if "selected_machine" in st.session_state:
+    m = st.session_state.selected_machine
+    total = df[df["Machine"] == m]["Minutes"].sum()
 
-  <div id="machineTileGrid" style="
-    display:grid;
-    grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));
-    gap:12px;
-    margin-top:20px;
-  "></div>
+    with st.modal(f"Machine {m} Summary"):
+        st.write(f"### Total Downtime: **{total} minutes**")
+        st.write("#### Breakdown Details")
+        st.dataframe(df[df["Machine"] == m])
 
-  <!-- Breakdown Table -->
-  <h3 style="text-align:center; margin-top:40px; color:#003366;">
-    📋 Breakdown Log Table (Editable Daily)
-  </h3>
+        if st.button("Close"):
+            del st.session_state.selected_machine
 
-  <table style="
-    width:100%;
-    border-collapse:collapse;
-    margin-top:15px;
-    font-size:13px;
-    text-align:center;
-  ">
-    <thead>
-      <tr style="background:#003366; color:white;">
-        <th style="padding:10px;">Date</th>
-        <th>Machine</th>
-        <th>Minutes</th>
-        <th>Reason</th>
-      </tr>
-    </thead>
+# -----------------------------------------
+# Breakdown Table (Editable)
+# -----------------------------------------
+st.subheader("📋 Breakdown Log Table (Editable)")
 
-    <tbody id="breakdownTableBody"></tbody>
-  </table>
+edited_df = st.data_editor(df, num_rows="dynamic")
 
-</div>
+# Save edits
+st.session_state.breakdowns = edited_df
 
-<!-- Popup Box -->
-<div id="machinePopup" style="
-  display:none;
-  position:fixed;
-  top:0; left:0;
-  width:100%;
-  height:100%;
-  background:rgba(0,0,0,0.6);
-  justify-content:center;
-  align-items:center;
-">
-
-  <div style="
-    background:white;
-    padding:25px;
-    border-radius:15px;
-    width:90%;
-    max-width:400px;
-    text-align:center;
-  ">
-    <h2 id="popupMachineName"></h2>
-    <p id="popupMachineInfo" style="color:gray;"></p>
-
-    <button onclick="closeMachinePopup()" style="
-      background:red;
-      color:white;
-      border:none;
-      padding:8px 15px;
-      border-radius:10px;
-      cursor:pointer;
-    ">
-      Close
-    </button>
-  </div>
-
-</div>
-
-<script>
-  let breakdownData =
-    JSON.parse(localStorage.getItem("nadec_breakdowns")) || [];
-
-  function toggleBreakdownForm() {
-    let box = document.getElementById("breakdownFormBox");
-    box.style.display = box.style.display === "none" ? "block" : "none";
-  }
-
-  function saveBreakdownEntry() {
-    let entry = {
-      date: document.getElementById("bDate").value,
-      machine: document.getElementById("bMachine").value,
-      time: Number(document.getElementById("bTime").value),
-      reason: document.getElementById("bReason").value
-    };
-
-    breakdownData.push(entry);
-    localStorage.setItem("nadec_breakdowns", JSON.stringify(breakdownData));
-
-    renderBreakdownSystem();
-  }
-
-  function renderBreakdownSystem() {
-    // Table Render
-    let table = document.getElementById("breakdownTableBody");
-    table.innerHTML = "";
-
-    breakdownData.forEach(e => {
-      table.innerHTML += `
-        <tr>
-          <td style="padding:8px;">${e.date}</td>
-          <td>${e.machine}</td>
-          <td>${e.time}</td>
-          <td>${e.reason}</td>
-        </tr>
-      `;
-    });
-
-    // Machine Tiles Render
-    let grid = document.getElementById("machineTileGrid");
-    grid.innerHTML = "";
-
-    for (let i = 1; i <= 18; i++) {
-      let m = "M" + i;
-
-      let total = breakdownData
-        .filter(x => x.machine === m)
-        .reduce((sum, x) => sum + x.time, 0);
-
-      grid.innerHTML += `
-        <div onclick="openMachinePopup('${m}', ${total})"
-          style="
-            background:white;
-            border-radius:15px;
-            padding:15px;
-            text-align:center;
-            box-shadow:0 3px 10px rgba(0,0,0,0.15);
-            cursor:pointer;
-          ">
-          <h3 style="margin:0; color:#003366;">${m}</h3>
-          <p style="margin:5px 0; font-size:13px; color:gray;">
-            ${total} min downtime
-          </p>
-        </div>
-      `;
-    }
-  }
-
-  function openMachinePopup(machine, total) {
-    document.getElementById("machinePopup").style.display = "flex";
-    document.getElementById("popupMachineName").innerText = machine;
-    document.getElementById("popupMachineInfo").innerText =
-      "Total Downtime Minutes: " + total;
-  }
-
-  function closeMachinePopup() {
-    document.getElementById("machinePopup").style.display = "none";
-  }
-
-  function exportBreakdownCSV() {
-    let csv = "Date,Machine,Minutes,Reason\n";
-
-    breakdownData.forEach(e => {
-      csv += `${e.date},${e.machine},${e.time},${e.reason}\n`;
-    });
-
-    let blob = new Blob([csv], { type: "text/csv" });
-    let link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "NADEC_Breakdown_Report.csv";
-    link.click();
-  }
-
-  renderBreakdownSystem();
-</script>
+# -----------------------------------------
+# Export CSV
+# -----------------------------------------
+st.download_button(
+    "⬇ Download CSV Report",
+    edited_df.to_csv(index=False),
+    file_name="NADEC_Breakdown_Report.csv",
+    mime="text/csv"
+)
