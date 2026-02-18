@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import plotly.express as px
 from datetime import datetime
+import io
 
 # ============================================
 # CONFIG
@@ -15,7 +16,7 @@ st.set_page_config(
 DATA_FILE = "breakdown_log.csv"
 
 # ============================================
-# LOAD OR CREATE DATA
+# LOAD OR CREATE DATA FILE
 # ============================================
 if os.path.exists(DATA_FILE):
     df = pd.read_csv(DATA_FILE)
@@ -26,9 +27,9 @@ else:
     ])
     df.to_csv(DATA_FILE, index=False)
 
-# Convert Date column
+# Convert Date column safely
 if not df.empty:
-    df["Date"] = pd.to_datetime(df["Date"])
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 
 # ============================================
 # MACHINE LIST (18 Machines)
@@ -71,7 +72,7 @@ total_minutes = df["Downtime_Minutes"].sum() if not df.empty else 0
 total_hours = total_minutes / 60
 
 worst_machine = "-"
-if not df.empty:
+if not df.empty and total_minutes > 0:
     worst_machine = df.groupby("Machine")["Downtime_Minutes"].sum().idxmax()
 
 col1, col2, col3, col4 = st.columns(4)
@@ -84,15 +85,17 @@ col4.metric("System Status", "LIVE ✅")
 st.divider()
 
 # ============================================
-# TOP MACHINE BARS (CUTE STYLE)
+# TOP MACHINE BAR CHART (CUTE STYLE)
 # ============================================
 st.subheader("⚙️ Live Machine Breakdown Status (18 Lines)")
 
 machine_summary = []
 for m in machines:
     m_data = df[df["Machine"] == m]
+
     downtime = m_data["Downtime_Minutes"].sum() if not m_data.empty else 0
     last_reason = m_data["Reason"].iloc[-1] if not m_data.empty else "Other"
+
     machine_summary.append({
         "Machine": m,
         "Downtime_Minutes": downtime,
@@ -101,20 +104,19 @@ for m in machines:
 
 summary_df = pd.DataFrame(machine_summary)
 
-# Plot Bar Chart
 fig = px.bar(
     summary_df,
     x="Machine",
     y="Downtime_Minutes",
     color="Reason",
     color_discrete_map=reason_color,
-    title="Breakdown Downtime per Machine (Minutes)",
+    title="Breakdown Downtime per Machine (Minutes)"
 )
 
 fig.update_layout(
-    height=400,
+    height=420,
     xaxis_title="Machines",
-    yaxis_title="Total Downtime (Minutes)",
+    yaxis_title="Total Downtime (Minutes)"
 )
 
 st.plotly_chart(fig, use_container_width=True)
@@ -122,18 +124,18 @@ st.plotly_chart(fig, use_container_width=True)
 st.divider()
 
 # ============================================
-# DATA ENTRY BUTTON (HIDDEN FORM)
+# OPERATOR ENTRY FORM (HIDDEN BUTTON)
 # ============================================
 st.subheader("➕ Operator Breakdown Entry")
 
 if "show_form" not in st.session_state:
     st.session_state.show_form = False
 
-# Button toggle
+# Toggle button
 if st.button("📝 Add New Breakdown Entry"):
     st.session_state.show_form = not st.session_state.show_form
 
-# Show Form Downside
+# Show form only when button clicked
 if st.session_state.show_form:
 
     with st.form("breakdown_form"):
@@ -157,7 +159,7 @@ if st.session_state.show_form:
 
         remarks = st.text_area("Remarks / Root Cause")
 
-        submitted = st.form_submit_button("✅ Save Breakdown")
+        submitted = st.form_submit_button("✅ Save Breakdown Entry")
 
         if submitted:
             new_row = {
@@ -171,47 +173,60 @@ if st.session_state.show_form:
 
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
 
+            # Save to CSV
             df.to_csv(DATA_FILE, index=False)
 
-            st.success("Breakdown Entry Saved Successfully ✅")
-            st.experimental_rerun()
+            st.success("✅ Breakdown Entry Saved Successfully!")
+
+            # Refresh dashboard
+            st.rerun()
 
 st.divider()
 
 # ============================================
-# BREAKDOWN LOG TABLE (BOTTOM)
+# BREAKDOWN EVENT LOG TABLE (BOTTOM)
 # ============================================
-st.subheader("📋 Breakdown Event Log (Live Data Table)")
+st.subheader("📋 Breakdown Event Log (Live Table)")
 
 if df.empty:
     st.info("No breakdown records entered yet.")
 else:
-    st.dataframe(df.sort_values("Date", ascending=False), use_container_width=True)
+    st.dataframe(
+        df.sort_values("Date", ascending=False),
+        use_container_width=True
+    )
+
+st.divider()
 
 # ============================================
-# DOWNLOAD REPORT BUTTONS
+# EXPORT BUTTONS (CSV + EXCEL)
 # ============================================
 st.subheader("⬇ Export Reports")
 
-c1, c2 = st.columns(2)
+# CSV Download
+st.download_button(
+    "⬇ Download CSV Report",
+    df.to_csv(index=False),
+    file_name="NADEC_breakdown_report.csv",
+    mime="text/csv"
+)
 
-with c1:
-    st.download_button(
-        "⬇ Download CSV Report",
-        df.to_csv(index=False),
-        file_name="NADEC_breakdown_report.csv"
-    )
+# Excel Download Fix (BytesIO)
+excel_buffer = io.BytesIO()
+df.to_excel(excel_buffer, index=False)
+excel_buffer.seek(0)
 
-with c2:
-    st.download_button(
-        "⬇ Download Excel Report",
-        df.to_excel("report.xlsx", index=False),
-        file_name="NADEC_breakdown_report.xlsx"
-    )
+st.download_button(
+    "⬇ Download Excel Report",
+    data=excel_buffer,
+    file_name="NADEC_breakdown_report.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
 
+# Footer
 st.markdown(
     "<p style='text-align:center; font-size:13px; color:gray;'>"
-    "NADEC Live Maintenance KPI Dashboard • Streamlit Real-Time Prototype"
+    "NADEC Live Maintenance KPI Dashboard • Streamlit Prototype • 2025"
     "</p>",
     unsafe_allow_html=True
 )
