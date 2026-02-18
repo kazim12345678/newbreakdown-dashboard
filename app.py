@@ -15,31 +15,40 @@ DATA_FILE = "breakdown_log.csv"
 
 MACHINES = [f"M{i}" for i in range(1, 19)]
 
-CATEGORIES = {
-    "Mechanical": "🔴 Mechanical",
-    "Electrical": "🔵 Electrical",
-    "Automation": "🟢 Automation"
-}
+# Required Columns (Fix for old CSV)
+REQUIRED_COLUMNS = [
+    "Date", "Machine", "Shift", "Classification",
+    "JobType", "Category",
+    "Problem", "WorkDone",
+    "StartTime", "EndTime",
+    "Downtime_Minutes",
+    "Technician",
+    "Status"
+]
 
 # ============================
 # LOAD / SAVE FUNCTIONS
 # ============================
 def load_data():
+    # If file exists, load it
     if os.path.exists(DATA_FILE):
-        return pd.read_csv(DATA_FILE)
+        df = pd.read_csv(DATA_FILE)
+
+        # ✅ Auto-Fix Missing Columns
+        for col in REQUIRED_COLUMNS:
+            if col not in df.columns:
+                df[col] = ""
+
+        return df
+
+    # If no file exists, create fresh structure
     else:
-        return pd.DataFrame(columns=[
-            "Date", "Machine", "Shift", "Classification",
-            "JobType", "Category",
-            "Problem", "WorkDone",
-            "StartTime", "EndTime",
-            "Downtime_Minutes",
-            "Technician",
-            "Status"
-        ])
+        return pd.DataFrame(columns=REQUIRED_COLUMNS)
+
 
 def save_data(df):
     df.to_csv(DATA_FILE, index=False)
+
 
 df = load_data()
 
@@ -66,10 +75,16 @@ st.markdown("""
 st.markdown("<div class='big-title'>🏭 NADEC CUTE Maintenance Breakdown Dashboard</div>", unsafe_allow_html=True)
 st.write("Real-time Machine Breakdown Tracking | Operator Entry | KPI Analytics")
 
+st.divider()
+
 # ============================
 # KPI SUMMARY
 # ============================
 total_events = len(df)
+
+# Convert downtime safely
+df["Downtime_Minutes"] = pd.to_numeric(df["Downtime_Minutes"], errors="coerce").fillna(0)
+
 total_downtime = df["Downtime_Minutes"].sum()
 
 worst_machine = "-"
@@ -92,7 +107,10 @@ st.divider()
 # ============================
 # CURRENT REAL-TIME BREAKDOWN BAR
 # ============================
-st.subheader("🚨 Current Active Breakdowns (Real-Time)")
+st.subheader("🚨 Current Active Breakdowns (Real-Time OPEN Jobs)")
+
+# Fix empty status
+df["Status"] = df["Status"].fillna("CLOSED")
 
 active_df = df[df["Status"] == "OPEN"]
 
@@ -104,7 +122,7 @@ else:
 st.divider()
 
 # ============================
-# OPERATOR ENTRY FORM (HIDDEN)
+# OPERATOR ENTRY FORM
 # ============================
 with st.expander("➕ Add New Breakdown Entry (Operator Form)", expanded=False):
 
@@ -119,7 +137,7 @@ with st.expander("➕ Add New Breakdown Entry (Operator Form)", expanded=False):
 
         jobtype = st.selectbox("Job Type", ["Breakdown (B/D)", "Corrective"])
 
-        category = st.selectbox("Breakdown Category", list(CATEGORIES.keys()))
+        category = st.selectbox("Breakdown Category", ["Mechanical", "Electrical", "Automation"])
 
         problem = st.text_area("Reported Problem")
         workdone = st.text_area("Description of Work Done")
@@ -166,29 +184,6 @@ with st.expander("➕ Add New Breakdown Entry (Operator Form)", expanded=False):
 st.divider()
 
 # ============================
-# CSV PASTE IMPORT
-# ============================
-st.subheader("📌 Paste Daily CSV Breakdown Log Here")
-
-csv_text = st.text_area("Paste CSV Text (Date,Machine,Shift,...)", height=150)
-
-if st.button("⬇️ Import CSV Data"):
-    try:
-        from io import StringIO
-        imported = pd.read_csv(StringIO(csv_text))
-
-        df = pd.concat([df, imported], ignore_index=True)
-        save_data(df)
-
-        st.success("✅ CSV Imported Successfully!")
-        st.rerun()
-
-    except Exception as e:
-        st.error(f"Error importing CSV: {e}")
-
-st.divider()
-
-# ============================
 # MACHINE WISE BAR CHART (M1–M18)
 # ============================
 st.subheader("⚙️ Machine Downtime Summary (M1–M18)")
@@ -200,22 +195,11 @@ st.bar_chart(machine_summary)
 st.divider()
 
 # ============================
-# DAILY LOG TABLE WITH DELETE OPTION
+# FULL DAILY LOG TABLE
 # ============================
 st.subheader("📋 Full Breakdown Daily Log Sheet")
 
 st.dataframe(df, use_container_width=True)
-
-st.write("### ❌ Delete a Record")
-
-if total_events > 0:
-    delete_index = st.number_input("Enter Row Index to Delete", min_value=0, max_value=len(df)-1)
-
-    if st.button("Delete Selected Row"):
-        df = df.drop(delete_index).reset_index(drop=True)
-        save_data(df)
-        st.success("Row Deleted Successfully!")
-        st.rerun()
 
 st.divider()
 
@@ -231,10 +215,4 @@ st.download_button(
     mime="text/csv"
 )
 
-st.download_button(
-    "⬇️ Download Excel Report",
-    df.to_excel("report.xlsx", index=False),
-    file_name="breakdown_report.xlsx"
-)
-
-st.success("✅ Dashboard Ready for NADEC Real-Time Use")
+st.success("✅ NADEC Dashboard Running Perfectly")
