@@ -1,20 +1,21 @@
 import streamlit as st
 import pandas as pd
 import datetime
+import plotly.express as px
 
 # -----------------------------
 # PAGE CONFIG
 # -----------------------------
 st.set_page_config(
-    page_title="NADEC Maintenance Breakdown Dashboard",
+    page_title="NADEC Breakdown Dashboard",
     layout="wide"
 )
 
 st.title("🛠️ NADEC Real-Time Breakdown Dashboard (18 Machines)")
-st.markdown("Operator Entry + Live KPI Bars + Download + CSV Upload")
+st.markdown("Interactive Bar Chart + Operator Entry + Download Reports")
 
 # -----------------------------
-# MACHINE LIST (18 Machines)
+# MACHINE LIST
 # -----------------------------
 machines = [
     "M1", "M2", "M3", "M4", "M5", "M6",
@@ -31,7 +32,7 @@ if "log" not in st.session_state:
     )
 
 # -----------------------------
-# CSV UPLOAD SECTION
+# CSV UPLOAD
 # -----------------------------
 st.subheader("📂 Upload Breakdown CSV (Optional)")
 
@@ -43,9 +44,9 @@ if uploaded:
     st.success("✅ CSV Loaded Successfully!")
 
 # -----------------------------
-# KPI BAR SECTION
+# TOP KPI BAR CHART
 # -----------------------------
-st.subheader("📊 Machine Breakdown Status (Top View)")
+st.subheader("📊 Machine Breakdown Overview (Click Any Bar)")
 
 if len(st.session_state.log) > 0:
     summary = (
@@ -53,23 +54,43 @@ if len(st.session_state.log) > 0:
         .sum()
         .reindex(machines)
         .fillna(0)
+        .reset_index()
     )
 else:
-    summary = pd.Series([0]*18, index=machines)
+    summary = pd.DataFrame({
+        "Machine": machines,
+        "Breakdown Time (min)": [0]*18
+    })
 
-# Display bars
-cols = st.columns(6)
+# Interactive Bar Chart
+fig = px.bar(
+    summary,
+    x="Machine",
+    y="Breakdown Time (min)",
+    title="Total Breakdown Minutes per Machine",
+    text="Breakdown Time (min)"
+)
 
-for i, m in enumerate(machines):
-    with cols[i % 6]:
-        minutes = int(summary[m])
-        st.metric(label=m, value=f"{minutes} min")
+fig.update_layout(
+    height=450,
+    xaxis_title="Machines",
+    yaxis_title="Breakdown Minutes",
+)
 
-        # Progress bar (max 500 min scale)
-        st.progress(min(minutes / 500, 1.0))
+selected = st.plotly_chart(fig, use_container_width=True)
 
 # -----------------------------
-# DATA ENTRY FORM (HIDDEN BUTTON)
+# CLICK MACHINE DROPDOWN (SIMULATES BAR CLICK)
+# -----------------------------
+st.markdown("### 🔍 Select Machine to View Breakdown Details")
+
+selected_machine = st.selectbox(
+    "Choose Machine",
+    ["All"] + machines
+)
+
+# -----------------------------
+# HIDDEN DATA ENTRY FORM
 # -----------------------------
 st.divider()
 st.subheader("➕ Operator Breakdown Entry")
@@ -122,44 +143,21 @@ with st.expander("📝 Click Here to Add New Breakdown Entry", expanded=False):
 # FILTER SECTION
 # -----------------------------
 st.divider()
-st.subheader("🔍 Filter Breakdown Report")
-
-colA, colB = st.columns(2)
-
-with colA:
-    filter_machine = st.selectbox(
-        "Filter by Machine",
-        ["All"] + machines
-    )
-
-with colB:
-    filter_date = st.selectbox(
-        "Filter by Date",
-        ["All"] + sorted(st.session_state.log["Date"].unique().tolist())
-        if len(st.session_state.log) > 0 else ["All"]
-    )
+st.subheader("📋 Breakdown Log Details")
 
 filtered = st.session_state.log.copy()
 
-if filter_machine != "All":
-    filtered = filtered[filtered["Machine"] == filter_machine]
+if selected_machine != "All":
+    filtered = filtered[filtered["Machine"] == selected_machine]
 
-if filter_date != "All":
-    filtered = filtered[filtered["Date"] == filter_date]
-
-# -----------------------------
-# BREAKDOWN LOG TABLE
-# -----------------------------
-st.divider()
-st.subheader("📋 Breakdown Log Table (Live Data)")
-
+# Show Breakdown Table
 st.dataframe(filtered, use_container_width=True)
 
 # -----------------------------
 # DOWNLOAD SECTION
 # -----------------------------
 st.divider()
-st.subheader("⬇️ Download Reports")
+st.subheader("⬇️ Download Report")
 
 csv_data = st.session_state.log.to_csv(index=False).encode("utf-8")
 
@@ -171,20 +169,22 @@ st.download_button(
 )
 
 # -----------------------------
-# AI SUPPORT BOX (Simple Analyzer)
+# MINI AI INSIGHTS
 # -----------------------------
 st.divider()
-st.subheader("🤖 Mini AI Assistant (Quick Insights)")
+st.subheader("🤖 Quick Maintenance Insight")
 
 if len(st.session_state.log) > 0:
-    worst_machine = summary.idxmax()
-    worst_time = summary.max()
+    worst_machine = summary.loc[
+        summary["Breakdown Time (min)"].idxmax(), "Machine"
+    ]
+    worst_time = summary["Breakdown Time (min)"].max()
 
     st.info(f"""
     ✅ Highest Breakdown Machine: **{worst_machine}**  
     ⏱ Total Breakdown Time: **{worst_time} minutes**
 
-    Suggestion: Focus preventive maintenance on this machine.
+    Suggestion: Focus preventive maintenance on this line.
     """)
 else:
     st.warning("No breakdown data yet. Upload CSV or add entry.")
@@ -193,4 +193,4 @@ else:
 # FOOTER
 # -----------------------------
 st.markdown("---")
-st.caption("NADEC Maintenance Dashboard Prototype | Streamlit + GitHub + Real-Time KPI System")
+st.caption("NADEC Dashboard Prototype | Streamlit Real-Time Breakdown KPI System")
