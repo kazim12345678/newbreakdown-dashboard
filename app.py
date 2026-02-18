@@ -1,219 +1,217 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import os
+import plotly.express as px
+from datetime import datetime
 
-# -----------------------------
-# PAGE CONFIG
-# -----------------------------
+# ============================================
+# CONFIG
+# ============================================
 st.set_page_config(
-    page_title="NADEC Breakdown Dashboard 2025",
+    page_title="NADEC Live Breakdown Dashboard",
     layout="wide"
 )
 
-st.title("🏭 NADEC Breakdown Maintenance Dashboard 2025")
-st.markdown("Real-time KPI Monitoring | Machine Downtime | Technician Contribution")
+DATA_FILE = "breakdown_log.csv"
 
-# -----------------------------
-# MACHINE LIST (18 Machines)
-# -----------------------------
-machines = [
-    "M1","M2","M3","M4","M5","M6","M7","M8","M9",
-    "M10","M11","M12","M13","M14","M15","M16","M17","M18"
-]
-
-# -----------------------------
-# FILE STORAGE
-# -----------------------------
-DATA_FILE = "breakdown_data.csv"
-
-# -----------------------------
-# CREATE FILE IF NOT EXISTS
-# -----------------------------
-if not os.path.exists(DATA_FILE):
-    df_init = pd.DataFrame(columns=[
-        "Date", "Machine", "Downtime Hours", "Reason", "Technician"
+# ============================================
+# LOAD OR CREATE DATA
+# ============================================
+if os.path.exists(DATA_FILE):
+    df = pd.read_csv(DATA_FILE)
+else:
+    df = pd.DataFrame(columns=[
+        "Date", "Machine", "Reason", "Downtime_Minutes",
+        "Technician", "Remarks"
     ])
-    df_init.to_csv(DATA_FILE, index=False)
+    df.to_csv(DATA_FILE, index=False)
 
-# -----------------------------
-# LOAD DATA
-# -----------------------------
-df = pd.read_csv(DATA_FILE)
+# Convert Date column
+if not df.empty:
+    df["Date"] = pd.to_datetime(df["Date"])
 
-# -----------------------------
-# SIDEBAR MENU
-# -----------------------------
-st.sidebar.header("⚙ Dashboard Controls")
+# ============================================
+# MACHINE LIST (18 Machines)
+# ============================================
+machines = [f"M{i}" for i in range(1, 19)]
 
-menu = st.sidebar.radio(
-    "Select View",
-    ["📊 Dashboard Overview", "➕ Add Breakdown Entry", "📂 Upload CSV Data", "📝 Edit/Delete Records"]
+# ============================================
+# REASON COLORS
+# ============================================
+reason_color = {
+    "Mechanical": "red",
+    "Electrical": "blue",
+    "Automation": "orange",
+    "Utility": "green",
+    "Other": "gray"
+}
+
+# ============================================
+# HEADER
+# ============================================
+st.markdown(
+    """
+    <h1 style='text-align:center; color:#003366;'>
+    🖥 NADEC Live Maintenance Breakdown System (CUTE Style)
+    </h1>
+    <p style='text-align:center; font-size:16px;'>
+    Real-Time Breakdown Tracking • 18 Machines • Operator Entry + KPI Monitoring
+    </p>
+    """,
+    unsafe_allow_html=True
 )
 
-# ======================================================
-# 1. DASHBOARD OVERVIEW
-# ======================================================
-if menu == "📊 Dashboard Overview":
+st.divider()
 
-    st.subheader("📌 KPI Summary")
+# ============================================
+# KPI SUMMARY
+# ============================================
+total_events = len(df)
+total_minutes = df["Downtime_Minutes"].sum() if not df.empty else 0
+total_hours = total_minutes / 60
 
-    # Convert downtime column safely
-    if not df.empty:
-        df["Downtime Hours"] = pd.to_numeric(df["Downtime Hours"], errors="coerce")
+worst_machine = "-"
+if not df.empty:
+    worst_machine = df.groupby("Machine")["Downtime_Minutes"].sum().idxmax()
 
-    total_downtime = df["Downtime Hours"].sum() if not df.empty else 0
-    total_events = len(df)
+col1, col2, col3, col4 = st.columns(4)
 
-    worst_machine = df.groupby("Machine")["Downtime Hours"].sum().idxmax() if total_events > 0 else "N/A"
-    worst_month = pd.to_datetime(df["Date"]).dt.month_name().mode()[0] if total_events > 0 else "N/A"
+col1.metric("Total Breakdown Events", total_events)
+col2.metric("Total Downtime Hours", f"{total_hours:.1f} hrs")
+col3.metric("Worst Machine", worst_machine)
+col4.metric("System Status", "LIVE ✅")
 
-    # KPI Cards Layout
-    col1, col2, col3, col4 = st.columns(4)
+st.divider()
 
-    col1.metric("⏱ Total Downtime Hours", f"{total_downtime:.1f} hrs")
-    col2.metric("🚨 Total Breakdown Events", total_events)
-    col3.metric("⚙ Worst Machine", worst_machine)
-    col4.metric("📅 Most Frequent Month", worst_month)
+# ============================================
+# TOP MACHINE BARS (CUTE STYLE)
+# ============================================
+st.subheader("⚙️ Live Machine Breakdown Status (18 Lines)")
 
-    st.divider()
+machine_summary = []
+for m in machines:
+    m_data = df[df["Machine"] == m]
+    downtime = m_data["Downtime_Minutes"].sum() if not m_data.empty else 0
+    last_reason = m_data["Reason"].iloc[-1] if not m_data.empty else "Other"
+    machine_summary.append({
+        "Machine": m,
+        "Downtime_Minutes": downtime,
+        "Reason": last_reason
+    })
 
-    # -----------------------------
-    # FILTERS
-    # -----------------------------
-    st.subheader("🔍 Filters")
+summary_df = pd.DataFrame(machine_summary)
 
-    fcol1, fcol2 = st.columns(2)
+# Plot Bar Chart
+fig = px.bar(
+    summary_df,
+    x="Machine",
+    y="Downtime_Minutes",
+    color="Reason",
+    color_discrete_map=reason_color,
+    title="Breakdown Downtime per Machine (Minutes)",
+)
 
-    selected_machine = fcol1.selectbox("Select Machine", ["All"] + machines)
+fig.update_layout(
+    height=400,
+    xaxis_title="Machines",
+    yaxis_title="Total Downtime (Minutes)",
+)
 
-    if not df.empty:
-        df["Month"] = pd.to_datetime(df["Date"]).dt.month_name()
+st.plotly_chart(fig, use_container_width=True)
 
-    selected_month = fcol2.selectbox(
-        "Select Month",
-        ["All"] + (df["Month"].unique().tolist() if not df.empty else [])
-    )
+st.divider()
 
-    filtered_df = df.copy()
+# ============================================
+# DATA ENTRY BUTTON (HIDDEN FORM)
+# ============================================
+st.subheader("➕ Operator Breakdown Entry")
 
-    if selected_machine != "All":
-        filtered_df = filtered_df[filtered_df["Machine"] == selected_machine]
+if "show_form" not in st.session_state:
+    st.session_state.show_form = False
 
-    if selected_month != "All":
-        filtered_df = filtered_df[filtered_df["Month"] == selected_month]
+# Button toggle
+if st.button("📝 Add New Breakdown Entry"):
+    st.session_state.show_form = not st.session_state.show_form
 
-    # -----------------------------
-    # CHARTS
-    # -----------------------------
-    st.subheader("📊 Breakdown Analytics")
+# Show Form Downside
+if st.session_state.show_form:
 
-    c1, c2 = st.columns(2)
+    with st.form("breakdown_form"):
 
-    # Chart 1: Machine Downtime
-    if not filtered_df.empty:
-        machine_summary = filtered_df.groupby("Machine")["Downtime Hours"].sum().reset_index()
-        fig1 = px.bar(
-            machine_summary,
-            x="Machine",
-            y="Downtime Hours",
-            title="Machine-wise Downtime Hours"
+        entry_date = st.date_input("Breakdown Date", datetime.today())
+
+        machine = st.selectbox("Select Machine", machines)
+
+        reason = st.selectbox(
+            "Breakdown Type",
+            ["Mechanical", "Electrical", "Automation", "Utility", "Other"]
         )
-        c1.plotly_chart(fig1, use_container_width=True)
 
-    # Chart 2: Reason Pie
-    if not filtered_df.empty:
-        reason_summary = filtered_df["Reason"].value_counts().reset_index()
-        reason_summary.columns = ["Reason", "Count"]
-
-        fig2 = px.pie(
-            reason_summary,
-            names="Reason",
-            values="Count",
-            title="Breakdown Reason Contribution"
+        downtime = st.number_input(
+            "Downtime Duration (Minutes)",
+            min_value=1,
+            step=5
         )
-        c2.plotly_chart(fig2, use_container_width=True)
 
-    # -----------------------------
-    # DATA TABLE
-    # -----------------------------
-    st.subheader("📋 Breakdown Records Table")
-    st.dataframe(filtered_df, use_container_width=True)
-
-    # Download Button
-    st.download_button(
-        "⬇ Download Filtered Data as CSV",
-        filtered_df.to_csv(index=False),
-        file_name="filtered_breakdown_data.csv"
-    )
-
-# ======================================================
-# 2. ADD BREAKDOWN ENTRY
-# ======================================================
-elif menu == "➕ Add Breakdown Entry":
-
-    st.subheader("➕ Add New Breakdown Record")
-
-    with st.form("entry_form"):
-        date = st.date_input("Breakdown Date")
-        machine = st.selectbox("Machine", machines)
-        downtime = st.number_input("Downtime Hours", min_value=0.0, step=0.5)
-        reason = st.selectbox("Reason", ["Mechanical", "Electrical", "Automation", "Utility", "Other"])
         technician = st.text_input("Technician Name")
 
-        submitted = st.form_submit_button("✅ Save Entry")
+        remarks = st.text_area("Remarks / Root Cause")
+
+        submitted = st.form_submit_button("✅ Save Breakdown")
 
         if submitted:
             new_row = {
-                "Date": date,
+                "Date": entry_date,
                 "Machine": machine,
-                "Downtime Hours": downtime,
                 "Reason": reason,
-                "Technician": technician
+                "Downtime_Minutes": downtime,
+                "Technician": technician,
+                "Remarks": remarks
             }
 
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+
             df.to_csv(DATA_FILE, index=False)
 
-            st.success("Breakdown Entry Saved Successfully!")
+            st.success("Breakdown Entry Saved Successfully ✅")
+            st.experimental_rerun()
 
-# ======================================================
-# 3. UPLOAD CSV
-# ======================================================
-elif menu == "📂 Upload CSV Data":
+st.divider()
 
-    st.subheader("📂 Upload Breakdown CSV File")
+# ============================================
+# BREAKDOWN LOG TABLE (BOTTOM)
+# ============================================
+st.subheader("📋 Breakdown Event Log (Live Data Table)")
 
-    uploaded = st.file_uploader("Upload CSV", type=["csv"])
+if df.empty:
+    st.info("No breakdown records entered yet.")
+else:
+    st.dataframe(df.sort_values("Date", ascending=False), use_container_width=True)
 
-    if uploaded:
-        uploaded_df = pd.read_csv(uploaded)
-        st.dataframe(uploaded_df)
+# ============================================
+# DOWNLOAD REPORT BUTTONS
+# ============================================
+st.subheader("⬇ Export Reports")
 
-        if st.button("✅ Replace Existing Data"):
-            uploaded_df.to_csv(DATA_FILE, index=False)
-            st.success("Data Updated Successfully! Restart dashboard.")
+c1, c2 = st.columns(2)
 
-# ======================================================
-# 4. EDIT / DELETE RECORDS
-# ======================================================
-elif menu == "📝 Edit/Delete Records":
+with c1:
+    st.download_button(
+        "⬇ Download CSV Report",
+        df.to_csv(index=False),
+        file_name="NADEC_breakdown_report.csv"
+    )
 
-    st.subheader("📝 Edit or Delete Breakdown Records")
+with c2:
+    st.download_button(
+        "⬇ Download Excel Report",
+        df.to_excel("report.xlsx", index=False),
+        file_name="NADEC_breakdown_report.xlsx"
+    )
 
-    if df.empty:
-        st.warning("No records available yet.")
-    else:
-        st.dataframe(df)
-
-        row_to_delete = st.number_input(
-            "Enter Row Number to Delete",
-            min_value=0,
-            max_value=len(df)-1,
-            step=1
-        )
-
-        if st.button("🗑 Delete Selected Row"):
-            df = df.drop(index=row_to_delete).reset_index(drop=True)
-            df.to_csv(DATA_FILE, index=False)
-            st.success("Row Deleted Successfully!")
+st.markdown(
+    "<p style='text-align:center; font-size:13px; color:gray;'>"
+    "NADEC Live Maintenance KPI Dashboard • Streamlit Real-Time Prototype"
+    "</p>",
+    unsafe_allow_html=True
+)
