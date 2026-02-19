@@ -1,875 +1,886 @@
 import streamlit as st
 import pandas as pd
-import altair as alt
-import re
-from bs4 import BeautifulSoup
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+from io import BytesIO
+from datetime import datetime, date, time, timedelta
+import os
 
-# Original HTML content
-html_content = '''<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NADEC Breakdown Maintenance Dashboard 2025</title>
+# =========================
+# BASIC CONFIG
+# =========================
+st.set_page_config(
+    page_title="KUTE – Kazim Utilization & Team Efficiency Dashboard",
+    layout="wide",
+)
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- Google Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
-
-  <style>
-    body {
-      margin: 0;
-      font-family: "Poppins", sans-serif;
-      background: linear-gradient(to right, #eef2f3, #ffffff);
-    }
-
-    header {
-      background: #003366;
-      color: white;
-      padding: 25px;
-      text-align: center;
-      font-size: 24px;
-      font-weight: 700;
-    }
-
-    .subhead {
-      font-size: 14px;
-      font-weight: 300;
-      margin-top: 6px;
-      color: #d9e6ff;
-    }
-
-    .container {
-      max-width: 1600px;
-      margin: auto;
-      padding: 20px;
-    }
-
-    /* KPI Cards */
-    .kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-      gap: 15px;
-      margin-bottom: 25px;
-    }
-
-    .kpi-card {
-      background: white;
-      padding: 18px;
-      border-radius: 15px;
-      box-shadow: 0px 4px 12px rgba(0,0,0,0.15);
-      text-align: center;
-    }
-
-    .kpi-card h2 {
-      font-size: 15px;
-      margin: 0;
-      color: #003366;
-    }
-
-    .kpi-card p {
-      font-size: 28px;
-      font-weight: bold;
-      margin: 10px 0 0;
-      color: #222;
-    }
-
-    /* Charts Grid */
-    .chart-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
-      gap: 20px;
-    }
-
-    .chart-box {
-      background: white;
-      padding: 15px;
-      border-radius: 15px;
-      box-shadow: 0px 4px 12px rgba(0,0,0,0.12);
-    }
-
-    h3 {
-      text-align: center;
-      color: #003366;
-      margin-top: 45px;
-    }
-
-    /* Compact Tables */
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 15px;
-      font-size: 12px;
-      background: white;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0px 4px 10px rgba(0,0,0,0.10);
-    }
-
-    th {
-      background: #003366;
-      color: white;
-      padding: 8px;
-      font-size: 12px;
-    }
-
-    td {
-      padding: 6px;
-      border-bottom: 1px solid #ddd;
-      text-align: center;
-    }
-
-    tr:hover {
-      background: #f2f6ff;
-    }
-
-    /* Table Section Box */
-    .section-box {
-      background: white;
-      padding: 20px;
-      margin-top: 30px;
-      border-radius: 16px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.10);
-    }
-
-    footer {
-      text-align: center;
-      padding: 15px;
-      margin-top: 30px;
-      font-size: 14px;
-      color: gray;
-    }
-
-    /* Mobile Friendly */
-    @media(max-width:650px){
-      header {font-size:18px;}
-      .chart-grid {grid-template-columns:1fr;}
-      table {font-size:11px;}
-    }
-  </style>
-</head>
-
-<body>
-
-<header>
-  NADEC Drinkable Maintenance Performance Report of 2025
-  <div class="subhead">
-    Breakdown Downtime | Machine Failures | Technician Workload Contribution Dashboard
-  </div>
-</header>
-
-<div class="container">
-
-  <!-- KPI Cards -->
-  <div class="kpi-grid">
-    <div class="kpi-card"><h2>Total Downtime Hours</h2><p>3466</p></div>
-    <div class="kpi-card"><h2>Total Breakdown Events</h2><p>8903</p></div>
-    <div class="kpi-card"><h2>Worst Downtime Month</h2><p>July</p></div>
-    <div class="kpi-card"><h2>Highest Breakdown Machine</h2><p>M15</p></div>
-    <div class="kpi-card"><h2>Top Technician Contributor</h2><p>Dante</p></div>
-  </div>
-
-  <!-- Charts -->
-  <div class="chart-grid">
-
-    <div class="chart-box">
-      <h3>Monthly Downtime Hours</h3>
-      <canvas id="monthlyChart"></canvas>
-    </div>
-
-    <div class="chart-box">
-      <h3>Top Machines Breakdown Count</h3>
-      <canvas id="machineChart"></canvas>
-    </div>
-
-    <div class="chart-box">
-      <h3>Technician Contribution Share</h3>
-      <canvas id="techChart"></canvas>
-    </div>
-
-    <div class="chart-box">
-      <h3>Top Technician Workload Ranking</h3>
-      <canvas id="techBar"></canvas>
-    </div>
-
-  </div>
-
-  <!-- Technician Full Table -->
-  <div class="section-box">
-    <h3>👷 Full Technician Monthly Breakdown Workload (Jan–Dec)</h3>
-
-    <table>
-      <tr>
-        <th>Technician</th>
-        <th>Jan</th><th>Feb</th><th>Mar</th><th>Apr</th>
-        <th>May</th><th>Jun</th><th>Jul</th><th>Aug</th>
-        <th>Sep</th><th>Oct</th><th>Nov</th><th>Dec</th>
-        <th>Total</th>
-      </tr>
-
-      <tr><td>Ali</td><td>50</td><td>54</td><td>65</td><td>65</td><td>70</td><td>68</td><td>78</td><td>90</td><td></td><td>43</td><td>88</td><td>82</td><td>753</td></tr>
-      <tr><td>Amgad</td><td>117</td><td>97</td><td>102</td><td></td><td>105</td><td>126</td><td>110</td><td>121</td><td>84</td><td>99</td><td>101</td><td>50</td><td>1112</td></tr>
-      <tr><td>Dante</td><td>129</td><td>110</td><td>160</td><td>40</td><td>86</td><td>105</td><td>120</td><td>142</td><td>134</td><td>189</td><td>163</td><td>163</td><td>1541</td></tr>
-      <tr><td>Sameer</td><td>216</td><td>98</td><td>91</td><td>129</td><td>81</td><td></td><td>163</td><td>166</td><td>145</td><td>176</td><td>140</td><td>74</td><td>1479</td></tr>
-      <tr><td>Gilbert</td><td>132</td><td>128</td><td>115</td><td>113</td><td>152</td><td>128</td><td>125</td><td>126</td><td>118</td><td>147</td><td>111</td><td></td><td>1395</td></tr>
-      <tr><td>Lito</td><td>143</td><td>130</td><td>140</td><td>125</td><td>134</td><td>83</td><td>101</td><td>139</td><td>126</td><td>72</td><td>11</td><td>32</td><td>1236</td></tr>
-      <tr><td>Husam</td><td>88</td><td>92</td><td>72</td><td></td><td>100</td><td>127</td><td>126</td><td>145</td><td>130</td><td>107</td><td>98</td><td>129</td><td>1214</td></tr>n      <tr><td>Nashwan</td><td>71</td><td>85</td><td>100</td><td>105</td><td>71</td><td></td><td>132</td><td>147</td><td>161</td><td>112</td><td>108</td><td>108</td><td>1200</td></tr>
-      <tr><td>Moneef</td><td>61</td><td>99</td><td>110</td><td>143</td><td>111</td><td>97</td><td>107</td><td>138</td><td>6</td><td>80</td><td>102</td><td>57</td><td>1111</td></tr>
-      <tr><td>Yousef</td><td>16</td><td>11</td><td>14</td><td>20</td><td>53</td><td>66</td><td>74</td><td>47</td><td>46</td><td>30</td><td>33</td><td>14</td><td>424</td></tr>
-
-    </table>
-  </div>
-
-  <!-- Month Downtime Table -->
-  <div class="section-box">
-    <h3>📅 Month-wise Breakdown Downtime Summary</h3>
-
-    <table>
-      <tr><th>Month</th><th>Total Downtime (HH:MM:SS)</th></tr>
-      <tr><td>Jan</td><td>285:51:00</td></tr>
-      <tr><td>Feb</td><td>241:58:00</td></tr>
-      <tr><td>Mar</td><td>312:16:00</td></tr>
-      <tr><td>Apr</td><td>222:32:00</td></tr>
-      <tr><td>May</td><td>304:34:00</td></tr>
-      <tr><td>Jun</td><td>260:13:00</td></tr>
-      <tr style="font-weight:bold;background:#fff3cd;"><td>Jul</td><td>446:58:00 (Highest)</td></tr>
-      <tr><td>Aug</td><td>277:00:00</td></tr>
-      <tr><td>Sep</td><td>260:12:00</td></tr>
-      <tr><td>Oct</td><td>327:08:00</td></tr>
-      <tr><td>Nov</td><td>270:41:00</td></tr>
-      <tr><td>Dec</td><td>257:24:00</td></tr>
-    </table>
-  </div>
-
-  <!-- Machine Table (FULL ORDER M1 → M18) -->
-  <div class="section-box">
-    <h3>⚙️ Machine-wise Breakdown Frequency Report</h3>
-
-    <table>
-      <tr><th>Machine</th><th>Total Breakdown Count</th></tr>
-      <tr><td>Crates Area/Line</td><td>635</td></tr>
-      <tr><td>M1</td><td>822</td></tr>
-      <tr><td>M2</td><td>621</td></tr>
-      <tr><td>M3</td><td>538</td></tr>
-      <tr><td>M4</td><td>590</td></tr>
-      <tr><td>M5</td><td>1</td></tr>
-      <tr><td>M6</td><td>574</td></tr>
-      <tr><td>M7</td><td>825</td></tr>
-      <tr><td>M8</td><td>614</td></tr>
-      <tr><td>M9</td><td>59</td></tr>
-      <tr><td>M10</td><td>1</td></tr>
-      <tr><td>M12</td><td>366</td></tr>
-      <tr><td>M13</td><td>317</td></tr>
-      <tr><td>M14</td><td>805</td></tr>
-      <tr style="font-weight:bold;background:#f8d7da;"><td>M15</td><td>963 (Highest)</td></tr>
-      <tr><td>M16</td><td>214</td></tr>
-      <tr><td>M17</td><td>511</td></tr>
-      <tr><td>M18</td><td>447</td></tr>
-    </table>
-  </div>
-
-</div>
-
-<footer>
-  NADEC Drinkable Plant | Technician Workload + Downtime Dashboard 2025 | GitHub Pages Ready
-</footer>
-
-<script>
-  new Chart(document.getElementById("monthlyChart"), {
-    type: "bar",
-    data: {
-      labels: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
-      datasets: [{
-        label: "Downtime Hours",
-        data: [285,241,312,222,304,260,446,277,260,327,270,257]
-      }]
-    }
-  });
-
-  new Chart(document.getElementById("machineChart"), {
-    type: "bar",
-    data: {
-      labels: ["M15","M7","M1","M14","M2"],
-      datasets: [{
-        label: "Breakdown Count",
-        data: [963,825,822,805,621]
-      }]
-    },
-    options: { indexAxis: "y" }
-  });
-
-  new Chart(document.getElementById("techChart"), {
-    type: "pie",
-    data: {
-      labels: ["Dante","Sameer","Gilbert","Lito","Husam","Ali"],
-      datasets: [{
-        data: [1541,1479,1395,1236,1214,753]
-      }]
-    }
-  });
-
-  new Chart(document.getElementById("techBar"), {
-    type: "bar",
-    data: {
-      labels: ["Dante","Sameer","Gilbert","Lito","Husam","Amgad","Ali"],
-      datasets: [{
-        label: "Total Contribution",
-        data: [1541,1479,1395,1236,1214,1112,753]
-      }]
-    },
-    options: { indexAxis: "y" }
-  });
-</script>
-
-</body>
-</html>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Machine Data Table</title>
+st.markdown(
+    """
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-            background-color: #f9f9f9;
-        }
-        table {
-            border-collapse: collapse;
-            width: 80%;
-            margin: 20px auto;
-            background-color: #fff;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px 12px;
-            text-align: center;
-        }
-        th {
-            background-color: #0077cc;
-            color: white;
-        }
-        tr:nth-child(even){
-            background-color: #f2f2f2;
-        }
-        caption {
-            caption-side: top;
-            font-size: 1.5em;
-            margin-bottom: 10px;
-            font-weight: bold;
-        }
+    .main {padding-top: 0rem;}
+    .block-container {padding-top: 1rem; padding-bottom: 1rem;}
+    .kpi-card {
+        padding: 0.8rem 1rem;
+        border-radius: 0.5rem;
+        background-color: #f5f7fa;
+        border: 1px solid #d9e2ec;
+    }
+    .kpi-title {
+        font-size: 0.8rem;
+        color: #627d98;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .kpi-value {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: #102a43;
+    }
+    .kpi-sub {
+        font-size: 0.75rem;
+        color: #829ab1;
+    }
     </style>
-</head>
-<body>
-
-<table>
-    <caption>Machine Area Wise Repeted Issue</caption>
-    <thead>
-        <tr>
-            <th>Machine No</th>
-            <th>Area</th>
-            <th>Count</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr><td>M1</td><td>Filling & Capping</td><td>543</td></tr>
-        <tr><td>M1</td><td>Downline</td><td>231</td></tr>
-        <tr><td>M1</td><td>Crates Area /Line</td><td>12</td></tr>
-        <tr><td>M2</td><td>Filling & Capping</td><td>434</td></tr>
-        <tr><td>M2</td><td>Downline</td><td>169</td></tr>
-        <tr><td>M2</td><td>Upstream</td><td>18</td></tr>
-        <tr><td>M3</td><td>Filling & Capping</td><td>250</td></tr>
-        <tr><td>M3</td><td>Upstream</td><td>50</td></tr>
-        <tr><td>M3</td><td>Downline</td><td>237</td></tr>
-        <tr><td>M3</td><td>Crates Area /Line</td><td>1</td></tr>
-        <tr><td>M4</td><td>Filling & Capping</td><td>283</td></tr>
-        <tr><td>M4</td><td>Downline</td><td>289</td></tr>
-        <tr><td>M4</td><td>Upstream</td><td>16</td></tr>
-        <tr><td>M4</td><td>Crates Area /Line</td><td>1</td></tr>
-        <tr><td>M5</td><td>Filling & Capping</td><td>1</td></tr>
-        <tr><td>M6</td><td>Filling & Capping</td><td>396</td></tr>n        <tr><td>M6</td><td>Upstream</td><td>115</td></tr>
-        <tr><td>M6</td><td>Downline</td><td>63</td></tr>
-        <tr><td>M7</td><td>Filling & Capping</td><td>324</td></tr>
-        <tr><td>M7</td><td>Upstream</td><td>88</td></tr>
-        <tr><td>M7</td><td>Downline</td><td>413</td></tr>
-        <tr><td>M8</td><td>Upstream</td><td>56</td></tr>n        <tr><td>M8</td><td>Downline</td><td>329</td></tr>
-        <tr><td>M8</td><td>Filling & Capping</td><td>229</td></tr>
-        <tr><td>M9</td><td>Upstream</td><td>6</td></tr>
-        <tr><td>M9</td><td>Filling & Capping</td><td>35</td></tr>
-        <tr><td>M9</td><td>Downline</td><td>18</td></tr>
-        <tr><td>M10</td><td>Downline</td><td>1</td></tr>
-        <tr><td>M12</td><td>Filling & Capping</td><td>115</td></tr>
-        <tr><td>M12</td><td>Downline</td><td>223</td></tr>
-        <tr><td>M12</td><td>Upstream</td><td>28</td></tr>n        <tr><td>M13</td><td>Upstream</td><td>65</td></tr>
-        <tr><td>M13</td><td>Downline</td><td>94</td></tr>n        <tr><td>M13</td><td>Filling & Capping</td><td>158</td></tr>
-        <tr><td>M14</td><td>Filling & Capping</td><td>546</td></tr>
-        <tr><td>M14</td><td>Downline</td><td>226</td></tr>
-        <tr><td>M14</td><td>Upstream</td><td>33</td></tr>
-        <tr><td>M15</td><td>Downline</td><td>378</td></tr>
-        <tr><td>M15</td><td>Upstream</td><td>178</td></tr>
-        <tr><td>M15</td><td>Filling & Capping</td><td>405</td></tr>
-        <tr><td>M15</td><td>Crates Area /Line</td><td>2</td></tr>
-        <tr><td>M16</td><td>Filling & Capping</td><td>123</td></tr>
-        <tr><td>M16</td><td>Upstream</td><td>9</td></tr>
-        <tr><td>M16</td><td>Downline</td><td>82</td></tr>n        <tr><td>M17</td><td>Filling & Capping</td><td>314</td></tr>
-        <tr><td>M17</td><td>Upstream</td><td>50</td></tr>
-        <tr><td>M17</td><td>Downline</td><td>147</td></tr>n        <tr><td>M18</td><td>Filling & Capping</td><td>259</td></tr>
-        <tr><td>M18</td><td>Upstream</td><td>24</td></tr>
-        <tr><td>M18</td><td>Downline</td><td>164</td></tr>
-        <tr><td>Crates Area/Line</td><td>Crates Area /Line</td><td>633</td></tr>
-        <tr><td>Crates Area/Line</td><td>Downline</td><td>2</td></tr>
-    </tbody>
-</table>
-  <!-- ================== BREAKDOWN DASHBOARD ADD-ON ================== -->
-
-<div class="card">
-  <h2>🔥 Hourly Breakdown Heatmap (Hour vs Month)</h2>
-  <div style="overflow-x:auto;">
-    <table id="heatmapTable" style="width:100%; border-collapse:collapse;"></table>
-  </div>
-</div>
-
-<div class="card">
-  <h2>📈 Monthly Breakdown Trend (Total per Month)</h2>
-  <canvas id="monthlyTrendChart"></canvas>
-</div>
-
-<div class="card">
-  <h2>📊 Total Breakdown by Hour (0–23)</h2>
-  <canvas id="hourlyTotalChart"></canvas>
-</div>
-
-
-<script>
-/* ===================== DATA ===================== */
-const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-
-const breakdownData = [
- [14.4,13.4,11.0,10.9,18.8,9.3,13.3,16.9,10.3,11.6,9.2,10.0],
- [11.0,11.2,17.3,9.9,10.1,13.2,11.8,11.7,11.5,19.5,12.3,15.7],
- [7.9,15.4,10.9,6.7,10.9,7.8,22.4,9.3,10.0,7.0,9.4,11.8],
- [5.9,11.0,8.8,8.8,9.5,8.0,8.9,10.9,5.8,4.4,7.0,9.5],
- [6.6,10.7,10.0,8.0,7.0,5.0,123.1,9.3,8.1,9.5,9.4,8.2],
- [1.5,1.7,18.0,5.8,2.5,0.9,4.1,3.3,1.4,0.7,1.3,2.6],
- [21.0,14.7,19.3,16.7,18.4,22.5,34.0,16.0,14.2,27.1,11.3,11.9],
- [14.6,14.7,14.0,8.0,20.0,19.3,15.0,21.5,22.5,22.0,24.4,17.3],
- [18.0,11.3,8.4,9.8,23.8,10.5,17.6,15.5,13.5,32.6,27.6,16.1],
- [10.0,11.3,15.5,9.6,15.2,16.9,16.6,14.3,10.8,28.5,9.4,9.0],
- [6.1,4.3,6.0,8.4,12.0,18.5,13.1,11.5,12.6,7.8,15.5,6.7],
- [3.8,3.9,12.4,1.7,3.2,5.6,0.8,6.0,1.8,2.4,4.5,3.3],
- [7.5,10.5,14.8,11.1,5.6,7.8,18.3,10.1,12.0,10.8,8.5,8.2],
- [12.3,9.9,13.5,8.7,20.3,13.7,17.1,21.7,11.5,17.1,17.7,14.0],
- [15.5,11.2,11.9,8.7,12.4,13.6,20.9,13.1,10.5,15.7,14.6,21.2],
- [8.4,12.0,7.0,13.5,10.7,8.2,12.6,9.0,17.8,15.3,11.0,10.4],
- [26.6,8.5,2.8,5.5,11.8,10.7,9.7,7.4,12.8,14.8,10.7,8.1],
- [17.8,4.3,18.2,1.9,4.4,5.6,8.3,3.0,2.6,3.1,3.6,3.7],
- [24.4,12.2,19.1,11.1,24.5,14.1,15.9,18.0,13.6,17.3,13.4,12.0],
- [4.7,4.4,18.2,13.4,12.8,1.4,4.5,3.8,1.4,4.4,6.9,1.0],
- [14.8,6.0,11.8,9.5,9.5,16.1,6.4,11.3,11.2,12.1,10.9,16.7],
- [14.8,14.8,14.2,8.5,12.9,12.1,12.1,14.0,11.9,13.4,9.8,15.1],
- [9.0,13.9,10.3,9.4,13.0,9.7,20.0,9.7,14.4,20.7,16.0,14.6],
- [9.3,10.4,19.1,16.7,15.0,9.8,20.6,9.8,18.0,9.5,6.0,10.0]
-];
-
-
-/* ===================== HEATMAP TABLE ===================== */
-let heatmapHTML = "<tr><th style='background:black;color:white;'>Hour</th>";
-
-months.forEach(m=>{
-  heatmapHTML += `<th style='background:black;color:white;'>${m}</th>`;
-});
-heatmapHTML += "</tr>";
-
-breakdownData.forEach((row,hour)=>{
-  heatmapHTML += `<tr><th style='background:#222;color:white;'>${hour}</th>`;
-
-  row.forEach(val=>{
-    let intensity = Math.min(val/35,1);
-    heatmapHTML += `\n      <td style="padding:6px;border:1px solid #ddd;\n      background:rgba(255,0,0,${intensity});\n      font-weight:bold;">\n      ${val.toFixed(1)}\n      </td>`;
-  });
-
-  heatmapHTML += "</tr>";
-});
-
-document.getElementById("heatmapTable").innerHTML = heatmapHTML;
-
-
-/* ===================== MONTHLY TREND ===================== */
-const monthlyTotals = months.map((m,i)=>
-  breakdownData.reduce((sum,row)=> sum + row[i], 0)
-);
-
-new Chart(document.getElementById("monthlyTrendChart"), {
-  type: "line",
-  data: {
-    labels: months,
-    datasets: [{
-      label: "Total Breakdown Hours per Month",
-      data: monthlyTotals,
-      borderWidth: 3,
-      tension: 0.3
-    }]
-  }
-});
-
-
-/* ===================== HOURLY TOTAL ===================== */
-const hourlyTotals = breakdownData.map(row =>
-  row.reduce((a,b)=> a+b, 0)
-);
-
-new Chart(document.getElementById("hourlyTotalChart"), {
-  type: "bar",
-  data: {
-    labels: [...Array(24).keys()],
-    datasets: [{
-      label: "Total Breakdown Hours (Yearly Total)",
-      data: hourlyTotals,
-      borderWidth: 1
-    }]
-  }
-});
-</script>
-
-<!-- ================== END ADD-ON ================== -->'''
-
-# 1. Data Extraction
-soup = BeautifulSoup(html_content, 'html.parser')
-
-# 1.1 Extract KPI Data
-kpi_cards = soup.find_all('div', class_='kpi-card')
-kpi_data = {}
-
-for card in kpi_cards:
-    kpi_name = card.find('h2').get_text(strip=True)
-    kpi_value = card.find('p').get_text(strip=True)
-    kpi_data[kpi_name] = kpi_value
-
-total_downtime_hours = kpi_data.get('Total Downtime Hours')
-total_breakdown_events = kpi_data.get('Total Breakdown Events')
-worst_downtime_month = kpi_data.get('Worst Downtime Month')
-highest_breakdown_machine = kpi_data.get('Highest Breakdown Machine')
-top_technician_contributor = kpi_data.get('Top Technician Contributor')
-
-# 1.2 Extract Monthly Downtime Data
-script_tags = soup.find_all('script')
-monthly_chart_script = None
-for script in script_tags:
-    if script.string and 'monthlyChart' in script.string:
-        monthly_chart_script = script.string
-        break
-
-monthly_downtime_labels = []
-monthly_downtime_data = []
-
-if monthly_chart_script:
-    labels_match = re.search(r'labels:\s*\[([^\]]+)\]', monthly_chart_script)
-    if labels_match:
-        labels_str = labels_match.group(1).replace('"', '').replace("'", '').split(',')
-        monthly_downtime_labels = [label.strip() for label in labels_str]
-
-    data_match = re.search(r'data:\s*\[([^\]]+)\]', monthly_chart_script)
-    if data_match:
-        data_str = data_match.group(1).split(',')
-        monthly_downtime_data = [int(val.strip()) for val in data_str]
-
-# 1.3 Extract Machine Breakdown Data
-machine_chart_config_str = None
-for script in script_tags:
-    if script.string:
-        match = re.search(r'new Chart\(document\.getElementById\("machineChart"\),\s*(\{.*?\})\);', script.string, re.DOTALL)
-        if match:
-            machine_chart_config_str = match.group(1)
-            break
-
-machine_breakdown_labels = []
-machine_breakdown_data = []
-
-if machine_chart_config_str:
-    labels_match = re.search(r'labels:\s*\[([^\]]+)\]', machine_chart_config_str)
-    if labels_match:
-        labels_str = labels_match.group(1).replace('"', '').replace("'", '').split(',')
-        machine_breakdown_labels = [label.strip() for label in labels_str]
-
-    data_match = re.search(r'data:\s*\[([^\]]+)\]', machine_chart_config_str)
-    if data_match:
-        data_str = data_match.group(1).split(',')
-        machine_breakdown_data = [int(val.strip()) for val in data_str]
-
-# 1.4 Extract Technician Contribution Share
-tech_chart_config_str = None
-for script in script_tags:
-    if script.string:
-        match = re.search(r'new Chart\(document\.getElementById\("techChart"\),\s*\{.*?data:\s*\{.*?labels:\s*\[([^\]]+)\].*?datasets:\s*\[\{.*?data:\s*\[([^\]]+)\]', script.string, re.DOTALL)
-        if match:
-            tech_contribution_labels_str = match.group(1)
-            tech_contribution_data_str = match.group(2)
-            break
-
-tech_contribution_labels = []
-tech_contribution_data = []
-
-if tech_contribution_labels_str and tech_contribution_data_str:
-    labels_list = tech_contribution_labels_str.replace('"', '').replace("'", '').split(',')
-    tech_contribution_labels = [label.strip() for label in labels_list]
-
-    data_list = tech_contribution_data_str.split(',')
-    tech_contribution_data = [int(val.strip()) for val in data_list]
-
-# 1.5 Extract Top Technician Workload Ranking
-tech_bar_config_str = None
-for script in script_tags:
-    if script.string:
-        match = re.search(r'new Chart\(document\.getElementById\("techBar"\),\s*\{.*?data:\s*\{.*?labels:\s*\[([^\]]+)\].*?datasets:\s*\[\{.*?data:\s*\[([^\]]+)\]', script.string, re.DOTALL)
-        if match:
-            tech_bar_labels_str = match.group(1)
-            tech_bar_data_str = match.group(2)
-            break
-
-tech_bar_labels = []
-tech_bar_data = []
-
-if tech_bar_labels_str and tech_bar_data_str:
-    labels_list = tech_bar_labels_str.replace('"', '').replace("'", '').split(',')
-    tech_bar_labels = [label.strip() for label in labels_list]
-
-    data_list = tech_bar_data_str.split(',')
-    tech_bar_data = [int(val.strip()) for val in data_list]
-
-
-# 1.6 Extract Monthly Breakdown Trend and Hourly Breakdown Heatmap Data
-main_script_content = None
-for script in script_tags:
-    if script.string and 'breakdownData' in script.string:
-        main_script_content = script.string
-        break
-
-months_trend = []
-breakdown_data_raw = []
-
-if main_script_content:
-    months_match = re.search(r'const months = \[(.*?)\];', main_script_content)
-    if months_match:
-        months_str_raw = months_match.group(1)
-        months_trend = [month.strip().strip('"') for month in months_str_raw.split(',')]
-
-    breakdown_data_match = re.search(r'const breakdownData = \[\s*((?:\[[\d\.,\s]+\](?:,\s*)?)+)\s*\];', main_script_content, re.DOTALL)
-
-    if breakdown_data_match:
-        breakdown_data_str = breakdown_data_match.group(1)
-        rows_raw = re.findall(r'\[[\d\.,\s]+\]', breakdown_data_str)
-        for row_str in rows_raw:
-            clean_row = row_str.replace('[', '').replace(']', '').strip()
-            if clean_row:
-                breakdown_data_raw.append([float(val.strip()) for val in clean_row.split(',')])
-
-monthly_breakdown_trend_data = []
-if months_trend and breakdown_data_raw:
-    if breakdown_data_raw and len(breakdown_data_raw[0]) == len(months_trend):
-        for i in range(len(months_trend)):
-            month_total = sum(row[i] for row in breakdown_data_raw)
-            monthly_breakdown_trend_data.append(month_total)
-
-hourly_labels = list(range(24))
-hourly_total_breakdown_data = []
-
-if breakdown_data_raw:
-    for i in range(len(breakdown_data_raw)):
-        hourly_total = sum(breakdown_data_raw[i])
-        hourly_total_breakdown_data.append(hourly_total)
-
-
-# 1.7 Extract Table Data
-
-# Technician Full Table
-technician_table_h3 = soup.find('h3', string='👷 Full Technician Monthly Breakdown Workload (Jan–Dec)')
-technician_workload_df = pd.DataFrame()
-if technician_table_h3:
-    technician_table = technician_table_h3.find_next_sibling('table')
-    if technician_table:
-        headers = [th.get_text(strip=True) for th in technician_table.find('tr').find_all('th')]
-        rows = []
-        for tr in technician_table.find_all('tr')[1:]:
-            cells = [td.get_text(strip=True) for td in tr.find_all('td')]
-            rows.append(cells)
-        technician_workload_df = pd.DataFrame(rows, columns=headers)
-
-# Month Downtime Table
-month_downtime_h3 = soup.find('h3', string='📅 Month-wise Breakdown Downtime Summary')
-month_downtime_df = pd.DataFrame()
-if month_downtime_h3:
-    month_downtime_table = month_downtime_h3.find_next_sibling('table')
-    if month_downtime_table:
-        headers = [th.get_text(strip=True) for th in month_downtime_table.find('tr').find_all('th')]
-        rows = []
-        for tr in month_downtime_table.find_all('tr')[1:]:
-            cells = [td.get_text(strip=True) for td in tr.find_all('td')]
-            rows.append(cells)
-        month_downtime_df = pd.DataFrame(rows, columns=headers)
-
-# Machine Breakdown Frequency Report
-machine_frequency_h3 = soup.find('h3', string='⚙️ Machine-wise Breakdown Frequency Report')
-machine_frequency_df = pd.DataFrame()
-if machine_frequency_h3:
-    machine_frequency_table = machine_frequency_h3.find_next_sibling('table')
-    if machine_frequency_table:
-        headers = [th.get_text(strip=True) for th in machine_frequency_table.find('tr').find_all('th')]
-        rows = []
-        for tr in machine_frequency_table.find_all('tr')[1:]:
-            cells = [td.get_text(strip=True) for td in tr.find_all('td')]
-            rows.append(cells)
-        machine_frequency_df = pd.DataFrame(rows, columns=headers)
-
-# Machine Area Wise Repeated Issue
-machine_area_table_caption = soup.find('caption', string='Machine Area Wise Repeted Issue')
-machine_area_df = pd.DataFrame()
-if machine_area_table_caption:
-    machine_area_table = machine_area_table_caption.find_parent('table')
-    if machine_area_table:
-        headers = [th.get_text(strip=True) for th in machine_area_table.find('thead').find('tr').find_all('th')]
-        rows = []
-        for tr in machine_area_table.find('tbody').find_all('tr'):
-            cells = [td.get_text(strip=True) for td in tr.find_all('td')]
-            rows.append(cells)
-        machine_area_df = pd.DataFrame(rows, columns=headers)
-
-# Hourly Breakdown Heatmap DataFrame
-heatmap_df = pd.DataFrame(breakdown_data_raw, columns=months_trend, index=hourly_labels)
-
-
-# 2. Streamlit Dashboard Layout
-st.set_page_config(layout="wide", page_title="NADEC Breakdown Maintenance Dashboard 2025")
-st.title("NADEC Drinkable Maintenance Performance Report of 2025")
-st.markdown("<h3 style='text-align: center; color: grey;'>Breakdown Downtime | Machine Failures | Technician Workload Contribution Dashboard</h3>", unsafe_allow_html=True)
-
-# KPI Section
-st.subheader("Key Performance Indicators")
-kpi_cols = st.columns(5)
-
-# Charts Section
-st.subheader("Visual Insights")
-chart_row_1 = st.columns(2)
-chart_row_2 = st.columns(2)
-
-# Tables Section
-st.subheader("Detailed Data Tables")
-
-# Containers for tables and additional charts
-technician_table_container = st.container()
-month_downtime_table_container = st.container()
-machine_frequency_table_container = st.container()
-machine_area_table_container = st.container()
-heatmap_container = st.container()
-monthly_trend_chart_container = st.container()
-hourly_total_chart_container = st.container()
-
-# 3. Populate Streamlit Dashboard
-
-# 3.1 Populate KPIs
-kpi_labels = list(kpi_data.keys())
-kpi_values = list(kpi_data.values())
-
-for i, col in enumerate(kpi_cols):
-    with col:
-        st.metric(label=kpi_labels[i], value=kpi_values[i])
-
-# 3.2 Populate Charts
-
-# Monthly Downtime Hours
-with chart_row_1[0]:
-    st.subheader("Monthly Downtime Hours")
-    monthly_downtime_df = pd.DataFrame({
-        'Month': monthly_downtime_labels,
-        'Downtime Hours': monthly_downtime_data
-    })
-    st.bar_chart(monthly_downtime_df.set_index('Month'))
-
-# Top Machines Breakdown Count
-with chart_row_1[1]:
-    st.subheader("Top Machines Breakdown Count")
-    machine_breakdown_df = pd.DataFrame({
-        'Machine': machine_breakdown_labels,
-        'Breakdown Count': machine_breakdown_data
-    })
-    chart = alt.Chart(machine_breakdown_df).mark_bar().encode(
-        x='Breakdown Count',
-        y=alt.Y('Machine', sort='-x')
-    ).properties(title='Top Machines Breakdown Count')
-    st.altair_chart(chart, width='stretch')
-
-# Technician Contribution Share (Pie Chart)
-with chart_row_2[0]:
-    st.subheader("Technician Contribution Share")
-    tech_contribution_df = pd.DataFrame({
-        'Technician': tech_contribution_labels,
-        'Contribution': tech_contribution_data
-    })
-    chart = alt.Chart(tech_contribution_df).mark_arc().encode(
-        theta=alt.Theta(field="Contribution", type="quantitative"),
-        color=alt.Color(field="Technician", type="nominal", title="Technician"),
-        order=alt.Order("Contribution", sort="descending"),
-        tooltip=["Technician", "Contribution"]
-    ).properties(title='Technician Contribution Share')
-    st.altair_chart(chart, width='stretch')
-
-# Top Technician Workload Ranking
-with chart_row_2[1]:
-    st.subheader("Top Technician Workload Ranking")
-    tech_workload_df = pd.DataFrame({
-        'Technician': tech_bar_labels,
-        'Total Contribution': tech_bar_data
-    })
-    chart = alt.Chart(tech_workload_df).mark_bar().encode(
-        x='Total Contribution',
-        y=alt.Y('Technician', sort='-x')
-    ).properties(title='Top Technician Workload Ranking')
-    st.altair_chart(chart, width='stretch')
-
-# Monthly Breakdown Trend
-with monthly_trend_chart_container:
-    st.subheader("Monthly Breakdown Trend (Total per Month)")
-    monthly_trend_df = pd.DataFrame({
-        'Month': months_trend,
-        'Total Breakdown Hours': monthly_breakdown_trend_data
-    })
-    st.line_chart(monthly_trend_df.set_index('Month'))
-
-# Total Breakdown by Hour
-with hourly_total_chart_container:
-    st.subheader("Total Breakdown by Hour (0–23)")
-    hourly_breakdown_df = pd.DataFrame({
-        'Hour': hourly_labels,
-        'Total Breakdown Hours': hourly_total_breakdown_data
-    })
-    st.bar_chart(hourly_breakdown_df.set_index('Hour'))
-
-
-# 3.3 Populate Tables
-
-# Display "Full Technician Monthly Breakdown Workload (Jan–Dec)"
-with technician_table_container:
-    st.markdown("#### ⚒⚒ Full Technician Monthly Breakdown Workload (Jan–Dec)")
-    st.dataframe(technician_workload_df, width='stretch')
-
-# Display "Month-wise Breakdown Downtime Summary"
-with month_downtime_table_container:
-    st.markdown("#### 📆 Month-wise Breakdown Downtime Summary")
-    st.dataframe(month_downtime_df, width='stretch')
-
-# Display "Machine-wise Breakdown Frequency Report"
-with machine_frequency_table_container:
-    st.markdown("#### ⚙️ Machine-wise Breakdown Frequency Report")
-    st.dataframe(machine_frequency_df, width='stretch')
-
-# Display "Machine Area Wise Repeated Issue"
-with machine_area_table_container:
-    st.markdown("#### Machine Area Wise Repeated Issue")
-    st.dataframe(machine_area_df, width='stretch')
-
-# Display "Hourly Breakdown Heatmap (Hour vs Month)"
-with heatmap_container:
-    st.markdown("#### 🔥 Hourly Breakdown Heatmap (Hour vs Month)")
-    st.dataframe(heatmap_df, width='stretch')
+    """,
+    unsafe_allow_html=True,
+)
+
+CSV_PATH = "breakdown_log.csv"
+MACHINES = [f"M{i}" for i in range(1, 19)]
+DEFAULT_CLASS = {
+    "M1": "Filler", "M2": "Filler", "M3": "Filler", "M4": "Packer",
+    "M5": "Packer", "M6": "Packer", "M7": "Labeler", "M8": "Labeler",
+    "M9": "Labeler", "M10": "Filler", "M11": "Packer", "M12": "Labeler",
+    "M13": "Filler", "M14": "Packer", "M15": "Labeler", "M16": "Filler",
+    "M17": "Packer", "M18": "Labeler",
+}
+
+REQUIRED_COLUMNS = [
+    "Date",
+    "Machine No",
+    "Shift",
+    "Machine Classification",
+    "Job Type",
+    "Breakdown Category",
+    "Reported Problem",
+    "Description of Work",
+    "Start Time",
+    "End Time",
+    "Time Consumed",
+    "Technician / Performed By",
+    "Status",
+]
+
+CATEGORY_COLORS = {
+    "Mechanical": "red",
+    "Electrical": "blue",
+    "Automation": "green",
+}
+
+# =========================
+# UTILS
+# =========================
+def init_storage():
+    if not os.path.exists(CSV_PATH):
+        df = pd.DataFrame(columns=REQUIRED_COLUMNS)
+        df.to_csv(CSV_PATH, index=False)
+
+
+def load_data():
+    init_storage()
+    df = pd.read_csv(CSV_PATH)
+    # Ensure all required columns exist
+    for col in REQUIRED_COLUMNS:
+        if col not in df.columns:
+            df[col] = np.nan
+    # Normalize types
+    if not df.empty:
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
+        df["Start Time"] = pd.to_datetime(df["Start Time"], errors="coerce").dt.time
+        df["End Time"] = pd.to_datetime(df["End Time"], errors="coerce").dt.time
+        df["Time Consumed"] = pd.to_numeric(df["Time Consumed"], errors="coerce")
+    return df
+
+
+def save_data(df):
+    df.to_csv(CSV_PATH, index=False)
+
+
+def parse_time_str(t):
+    if isinstance(t, time):
+        return t
+    if pd.isna(t):
+        return None
+    for fmt in ("%H:%M", "%H:%M:%S", "%I:%M %p"):
+        try:
+            return datetime.strptime(str(t), fmt).time()
+        except Exception:
+            continue
+    return None
+
+
+def calculate_time_consumed(start_t, end_t):
+    s = parse_time_str(start_t)
+    e = parse_time_str(end_t)
+    if not s or not e:
+        return np.nan
+    dt_start = datetime.combine(date.today(), s)
+    dt_end = datetime.combine(date.today(), e)
+    if dt_end < dt_start:
+        dt_end += timedelta(days=1)
+    return (dt_end - dt_start).total_seconds() / 60.0
+
+
+def ensure_session_state():
+    if "df" not in st.session_state:
+        st.session_state.df = load_data()
+    if "selected_machine" not in st.session_state:
+        st.session_state.selected_machine = None
+    if "click_data" not in st.session_state:
+        st.session_state.click_data = None
+    if "last_refresh" not in st.session_state:
+        st.session_state.last_refresh = datetime.now()
+
+
+def filter_data(df, date_range, machines, category, tech, job_type):
+    if date_range:
+        start, end = date_range
+        df = df[(df["Date"] >= start) & (df["Date"] <= end)]
+    if machines:
+        df = df[df["Machine No"].isin(machines)]
+    if category and category != "All":
+        df = df[df["Breakdown Category"] == category]
+    if tech:
+        df = df[df["Technician / Performed By"].str.contains(tech, case=False, na=False)]
+    if job_type and job_type != "All":
+        df = df[df["Job Type"] == job_type]
+    return df
+
+
+def export_excel(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Breakdown Log")
+    return output.getvalue()
+
+
+def export_pdf(df):
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.units import cm
+
+        buffer = BytesIO()
+        c = canvas.Canvas(buffer, pagesize=A4)
+        width, height = A4
+        x_margin = 1.5 * cm
+        y = height - 2 * cm
+
+        title = "KUTE – Maintenance Breakdown Report"
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(x_margin, y, title)
+        y -= 1 * cm
+
+        c.setFont("Helvetica", 8)
+        cols = ["Date", "Machine No", "Shift", "Job Type", "Breakdown Category",
+                "Reported Problem", "Time Consumed", "Technician / Performed By", "Status"]
+        col_widths = [2.0, 1.5, 1.5, 2.0, 2.0, 5.0, 2.0, 3.0, 2.0]
+        header_y = y
+        x = x_margin
+        for col, w in zip(cols, col_widths):
+            c.drawString(x, header_y, col)
+            x += w * cm
+        y -= 0.5 * cm
+
+        for _, row in df[cols].fillna("").iterrows():
+            if y < 2 * cm:
+                c.showPage()
+                y = height - 2 * cm
+                c.setFont("Helvetica", 8)
+            x = x_margin
+            for col, w in zip(cols, col_widths):
+                text = str(row[col])
+                if len(text) > 40:
+                    text = text[:37] + "..."
+                c.drawString(x, y, text)
+                x += w * cm
+            y -= 0.4 * cm
+
+        c.showPage()
+        c.save()
+        pdf = buffer.getvalue()
+        buffer.close()
+        return pdf, None
+    except Exception as e:
+        return None, str(e)
+
+
+def normalize_columns(upload_df):
+    mapping_keywords = {
+        "Date": ["date"],
+        "Machine No": ["machine", "m/c", "line"],
+        "Shift": ["shift"],
+        "Machine Classification": ["class", "filler", "packer", "labeler"],
+        "Job Type": ["job type", "bd", "breakdown", "corrective"],
+        "Breakdown Category": ["category", "mechanical", "electrical", "automation"],
+        "Reported Problem": ["reported", "problem", "issue"],
+        "Description of Work": ["description", "work done", "action"],
+        "Start Time": ["start", "from time"],
+        "End Time": ["end", "to time"],
+        "Technician / Performed By": ["tech", "technician", "performed", "by"],
+        "Status": ["status", "open", "closed"],
+    }
+
+    cols_lower = {c: c.lower().strip() for c in upload_df.columns}
+    new_df = pd.DataFrame()
+
+    for target, keys in mapping_keywords.items():
+        found = None
+        for orig, low in cols_lower.items():
+            if any(k in low for k in keys):
+                found = orig
+                break
+        if found is not None:
+            new_df[target] = upload_df[found]
+        else:
+            new_df[target] = np.nan
+
+    # Time Consumed will be calculated later
+    new_df["Time Consumed"] = np.nan
+    return new_df
+
+
+def compute_time_for_df(df):
+    df["Start Time"] = df["Start Time"].apply(parse_time_str)
+    df["End Time"] = df["End Time"].apply(parse_time_str)
+    df["Time Consumed"] = df.apply(
+        lambda r: calculate_time_consumed(r["Start Time"], r["End Time"]), axis=1
+    )
+    return df
+
+
+def get_mtd_data(df):
+    if df.empty:
+        return df
+    today = date.today()
+    return df[(df["Date"] >= date(today.year, today.month, 1)) & (df["Date"] <= today)]
+
+
+def get_hour_from_time(t):
+    if isinstance(t, time):
+        return t.hour
+    try:
+        return parse_time_str(t).hour
+    except Exception:
+        return np.nan
+
+
+# =========================
+# DIALOGS
+# =========================
+@st.dialog("Machine Breakdown Details")
+def machine_details_dialog(machine, df):
+    st.write(f"Breakdown details for **{machine}**")
+    if df.empty:
+        st.info("No breakdown records for this machine in the selected period.")
+    else:
+        st.dataframe(df.sort_values("Date", ascending=False), use_container_width=True, height=400)
+
+
+@st.dialog("Add / Edit Breakdown Entry")
+def breakdown_form_dialog(edit_index=None):
+    df = st.session_state.df.copy()
+    is_edit = edit_index is not None
+
+    if is_edit:
+        row = df.loc[edit_index]
+        st.write(f"Editing record for **{row['Machine No']}** on **{row['Date']}**")
+    else:
+        row = {col: None for col in REQUIRED_COLUMNS}
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        date_val = st.date_input(
+            "Date",
+            value=row["Date"] if isinstance(row["Date"], date) else date.today(),
+        )
+        machine = st.selectbox("Machine No", MACHINES, index=MACHINES.index(row["Machine No"]) if row["Machine No"] in MACHINES else 0)
+        shift = st.selectbox("Shift", ["Day", "Night"], index=["Day", "Night"].index(row["Shift"]) if row["Shift"] in ["Day", "Night"] else 0)
+    with col2:
+        mclass = st.text_input(
+            "Machine Classification",
+            value=row.get("Machine Classification") or DEFAULT_CLASS.get(machine, ""),
+        )
+        job_type = st.selectbox(
+            "Job Type",
+            ["Breakdown B/D", "Corrective"],
+            index=["Breakdown B/D", "Corrective"].index(row["Job Type"]) if row["Job Type"] in ["Breakdown B/D", "Corrective"] else 0,
+        )
+        category = st.selectbox(
+            "Breakdown Category",
+            ["Mechanical", "Electrical", "Automation"],
+            index=["Mechanical", "Electrical", "Automation"].index(row["Breakdown Category"]) if row["Breakdown Category"] in ["Mechanical", "Electrical", "Automation"] else 0,
+        )
+    with col3:
+        start_time = st.time_input(
+            "Start Time",
+            value=row["Start Time"] if isinstance(row["Start Time"], time) else datetime.now().time().replace(second=0, microsecond=0),
+        )
+        end_time = st.time_input(
+            "End Time",
+            value=row["End Time"] if isinstance(row["End Time"], time) else (datetime.now() + timedelta(minutes=30)).time().replace(second=0, microsecond=0),
+        )
+        tech = st.text_input("Technician / Performed By", value=row.get("Technician / Performed By") or "")
+
+    reported = st.text_area("Reported Problem", value=row.get("Reported Problem") or "")
+    work_desc = st.text_area("Description of Work", value=row.get("Description of Work") or "")
+    status = st.selectbox(
+        "Status",
+        ["OPEN", "CLOSED"],
+        index=["OPEN", "CLOSED"].index(row["Status"]) if row["Status"] in ["OPEN", "CLOSED"] else 0,
+    )
+
+    if st.button("Save Entry", type="primary", use_container_width=True):
+        time_consumed = calculate_time_consumed(start_time, end_time)
+        new_row = {
+            "Date": date_val,
+            "Machine No": machine,
+            "Shift": shift,
+            "Machine Classification": mclass,
+            "Job Type": job_type,
+            "Breakdown Category": category,
+            "Reported Problem": reported,
+            "Description of Work": work_desc,
+            "Start Time": start_time,
+            "End Time": end_time,
+            "Time Consumed": time_consumed,
+            "Technician / Performed By": tech,
+            "Status": status,
+        }
+        if is_edit:
+            for k, v in new_row.items():
+                df.at[edit_index, k] = v
+        else:
+            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+
+        st.session_state.df = df
+        save_data(df)
+        st.success("Entry saved successfully.")
+        st.rerun()
+
+
+# =========================
+# AUTO REFRESH
+# =========================
+def auto_refresh_block():
+    refresh_interval_sec = 120
+    elapsed = (datetime.now() - st.session_state.last_refresh).total_seconds()
+    remaining = max(0, int(refresh_interval_sec - elapsed))
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.caption("Dashboard auto-refreshes every 2 minutes to reflect latest breakdown entries.")
+    with col2:
+        st.metric("Next refresh (sec)", remaining)
+    if remaining <= 0:
+        st.session_state.last_refresh = datetime.now()
+        st.rerun()
+
+
+# =========================
+# MAIN APP
+# =========================
+ensure_session_state()
+auto_refresh_block()
+
+st.markdown(
+    "<h2 style='color:#004b8d; margin-bottom:0.2rem;'>KUTE – Kazim Utilization & Team Efficiency Dashboard</h2>",
+    unsafe_allow_html=True,
+)
+st.markdown(
+    "<p style='color:#627d98; margin-top:0;'>Real-time maintenance breakdown monitoring for 18 production machines (M1–M18).</p>",
+    unsafe_allow_html=True,
+)
+
+# Reload from disk in case of external changes
+st.session_state.df = load_data()
+df = st.session_state.df
+
+# =========================
+# FILTERS (GLOBAL)
+# =========================
+with st.expander("Filters", expanded=True):
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        if df.empty or df["Date"].isna().all():
+            date_range = None
+        else:
+            min_d = df["Date"].min()
+            max_d = df["Date"].max()
+            date_range = st.date_input("Date Range", value=(min_d, max_d))
+            if isinstance(date_range, date):
+                date_range = (date_range, date_range)
+    with col2:
+        machines_filter = st.multiselect("Machine Selection", MACHINES)
+    with col3:
+        category_filter = st.selectbox("Breakdown Category", ["All", "Mechanical", "Electrical", "Automation"])
+    with col4:
+        tech_filter = st.text_input("Technician Name")
+    with col5:
+        job_type_filter = st.selectbox("Job Type", ["All", "Breakdown B/D", "Corrective"])
+
+filtered_df = filter_data(df.copy(), date_range, machines_filter, category_filter, tech_filter, job_type_filter)
+
+# =========================
+# KPI CARDS
+# =========================
+col_k1, col_k2, col_k3, col_k4, col_k5, col_k6 = st.columns(6)
+
+total_downtime_min = filtered_df["Time Consumed"].sum() if not filtered_df.empty else 0
+total_events = len(filtered_df)
+pending_jobs = len(filtered_df[filtered_df["Status"] == "OPEN"]) if not filtered_df.empty else 0
+
+worst_machine = (
+    filtered_df.groupby("Machine No")["Time Consumed"].sum().sort_values(ascending=False).index[0]
+    if not filtered_df.empty and filtered_df["Machine No"].notna().any()
+    else "-"
+)
+
+if not filtered_df.empty and filtered_df["Date"].notna().any():
+    month_series = filtered_df["Date"].apply(lambda d: d.replace(day=1))
+    worst_month_val = (
+        month_series.groupby(month_series).apply(
+            lambda idx: filtered_df.loc[idx.index, "Time Consumed"].sum()
+        ).sort_values(ascending=False).index[0]
+    )
+    worst_month = worst_month_val.strftime("%b %Y")
+else:
+    worst_month = "-"
+
+top_tech = (
+    filtered_df.groupby("Technician / Performed By")["Time Consumed"].sum().sort_values(ascending=False).index[0]
+    if not filtered_df.empty and filtered_df["Technician / Performed By"].notna().any()
+    else "-"
+)
+
+with col_k1:
+    st.markdown("<div class='kpi-card'><div class='kpi-title'>Total Downtime</div>"
+                f"<div class='kpi-value'>{total_downtime_min/60:.1f} h</div>"
+                "<div class='kpi-sub'>Filtered period</div></div>", unsafe_allow_html=True)
+with col_k2:
+    st.markdown("<div class='kpi-card'><div class='kpi-title'>Breakdown Events</div>"
+                f"<div class='kpi-value'>{total_events}</div>"
+                "<div class='kpi-sub'>All job types</div></div>", unsafe_allow_html=True)
+with col_k3:
+    st.markdown("<div class='kpi-card'><div class='kpi-title'>Worst Machine</div>"
+                f"<div class='kpi-value'>{worst_machine}</div>"
+                "<div class='kpi-sub'>By downtime</div></div>", unsafe_allow_html=True)
+with col_k4:
+    st.markdown("<div class='kpi-card'><div class='kpi-title'>Worst Month</div>"
+                f"<div class='kpi-value'>{worst_month}</div>"
+                "<div class='kpi-sub'>By downtime</div></div>", unsafe_allow_html=True)
+with col_k5:
+    st.markdown("<div class='kpi-card'><div class='kpi-title'>Top Technician</div>"
+                f"<div class='kpi-value'>{top_tech}</div>"
+                "<div class='kpi-sub'>By downtime handled</div></div>", unsafe_allow_html=True)
+with col_k6:
+    st.markdown("<div class='kpi-card'><div class='kpi-title'>Pending Jobs</div>"
+                f"<div class='kpi-value'>{pending_jobs}</div>"
+                "<div class='kpi-sub'>Status = OPEN</div></div>", unsafe_allow_html=True)
+
+st.markdown("---")
+
+# =========================
+# TABS
+# =========================
+tab_home, tab_reports, tab_history, tab_team, tab_entry = st.tabs(
+    ["Home", "Breakdown Reports", "Machine History", "Team Contribution", "Data Entry"]
+)
+
+# =========================
+# HOME TAB – LIVE MACHINE STATUS
+# =========================
+with tab_home:
+    st.subheader("Live Machine Status – Month-to-Date Downtime")
+
+    mtd_df = get_mtd_data(filtered_df.copy())
+    if mtd_df.empty:
+        st.info("No breakdown data available for the selected filters / current month.")
+    else:
+        # Prepare stacked downtime by category
+        pivot = (
+            mtd_df.groupby(["Machine No", "Breakdown Category"])["Time Consumed"]
+            .sum()
+            .reset_index()
+        )
+        pivot["Time Consumed"] = pivot["Time Consumed"].fillna(0)
+
+        # Ensure all machines present
+        for m in MACHINES:
+            for cat in ["Mechanical", "Electrical", "Automation"]:
+                if not ((pivot["Machine No"] == m) & (pivot["Breakdown Category"] == cat)).any():
+                    pivot = pd.concat(
+                        [pivot, pd.DataFrame([{"Machine No": m, "Breakdown Category": cat, "Time Consumed": 0}])],
+                        ignore_index=True,
+                    )
+
+        pivot = pivot.sort_values("Machine No")
+        fig = go.Figure()
+        for cat in ["Mechanical", "Electrical", "Automation"]:
+            sub = pivot[pivot["Breakdown Category"] == cat]
+            fig.add_trace(
+                go.Bar(
+                    y=sub["Machine No"],
+                    x=sub["Time Consumed"],
+                    name=cat,
+                    orientation="h",
+                    marker_color=CATEGORY_COLORS.get(cat, "gray"),
+                    customdata=sub["Machine No"],
+                    hovertemplate="<b>%{customdata}</b><br>Category: %{fullData.name}<br>Downtime: %{x:.1f} min<extra></extra>",
+                )
+            )
+
+        fig.update_layout(
+            barmode="stack",
+            xaxis_title="Total Downtime (minutes) – MTD",
+            yaxis_title="Machine",
+            height=600,
+            legend_title="Breakdown Category",
+            margin=dict(l=10, r=10, t=40, b=10),
+        )
+
+        click = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="home_bar")
+
+        # Handle click
+        if click and click.selection and len(click.selection.points) > 0:
+            # Streamlit's on_select returns selection; but to be safe, also check click_data from session
+            pass
+
+        # Fallback: use clickData from session_state if available
+        click_data = st.session_state.get("home_bar", None)
+        # Newer Streamlit returns click data via st.session_state["home_bar"].selection, but to keep simple:
+        # We'll use Plotly's clickData via st.session_state if available
+        if "plotly_click" in st.session_state:
+            cd = st.session_state["plotly_click"]
+        else:
+            cd = None
+
+        # Simpler: allow machine selection via dropdown as alternative
+        st.markdown("##### Quick Machine Detail View")
+        colm1, colm2 = st.columns([2, 1])
+        with colm1:
+            selected_machine = st.selectbox("Select Machine for breakdown details", ["None"] + MACHINES)
+        with colm2:
+            if st.button("Show Details", use_container_width=True):
+                if selected_machine != "None":
+                    machine_df = mtd_df[mtd_df["Machine No"] == selected_machine]
+                    machine_details_dialog(selected_machine, machine_df)
+
+# =========================
+# BREAKDOWN REPORTS TAB
+# =========================
+with tab_reports:
+    st.subheader("Breakdown Reports – Daily Log (Editable)")
+
+    if filtered_df.empty:
+        st.info("No breakdown records for the selected filters.")
+    else:
+        # Show table with Edit/Delete buttons
+        display_df = filtered_df.copy().reset_index()  # keep original index for editing
+        display_df.rename(columns={"index": "Record ID"}, inplace=True)
+
+        st.caption("Use Edit/Delete buttons per row to maintain the breakdown log.")
+        for _, row in display_df.sort_values("Date", ascending=False).iterrows():
+            with st.expander(
+                f"{row['Date']} | {row['Machine No']} | {row['Breakdown Category']} | {row['Time Consumed']:.1f} min"
+            ):
+                st.write(row.drop(labels=["Record ID"]))
+                c1, c2, c3 = st.columns([1, 1, 6])
+                with c1:
+                    if st.button("Edit", key=f"edit_{row['Record ID']}"):
+                        breakdown_form_dialog(edit_index=row["Record ID"])
+                with c2:
+                    if st.button("Delete", key=f"del_{row['Record ID']}"):
+                        df = st.session_state.df
+                        df = df.drop(index=row["Record ID"])
+                        df = df.reset_index(drop=True)
+                        st.session_state.df = df
+                        save_data(df)
+                        st.warning("Record deleted.")
+                        st.rerun()
+
+    st.markdown("### Export Data")
+    col_e1, col_e2, col_e3 = st.columns(3)
+    with col_e1:
+        csv_bytes = filtered_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "Download CSV",
+            data=csv_bytes,
+            file_name="breakdown_log_filtered.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    with col_e2:
+        excel_bytes = export_excel(filtered_df)
+        st.download_button(
+            "Download Excel",
+            data=excel_bytes,
+            file_name="breakdown_log_filtered.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
+        )
+    with col_e3:
+        pdf_bytes, pdf_err = export_pdf(filtered_df)
+        if pdf_bytes:
+            st.download_button(
+                "Download PDF Report",
+                data=pdf_bytes,
+                file_name="breakdown_report.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+            )
+        else:
+            st.button(
+                "Download PDF Report (ReportLab not installed)",
+                disabled=True,
+                use_container_width=True,
+            )
+            st.caption("Install 'reportlab' package to enable PDF export.")
+
+
+# =========================
+# MACHINE HISTORY TAB
+# =========================
+with tab_history:
+    st.subheader("Machine History & Analytics")
+
+    col_h1, col_h2 = st.columns(2)
+
+    # Machine-wise downtime ranking
+    with col_h1:
+        st.markdown("#### Machine-wise Downtime Ranking")
+        if filtered_df.empty:
+            st.info("No data for ranking.")
+        else:
+            rank_df = (
+                filtered_df.groupby("Machine No")["Time Consumed"]
+                .sum()
+                .reset_index()
+                .sort_values("Time Consumed", ascending=False)
+            )
+            fig_rank = px.bar(
+                rank_df,
+                x="Machine No",
+                y="Time Consumed",
+                labels={"Time Consumed": "Downtime (min)", "Machine No": "Machine"},
+                color="Time Consumed",
+                color_continuous_scale="Reds",
+            )
+            fig_rank.update_layout(height=350, margin=dict(l=10, r=10, t=40, b=10))
+            st.plotly_chart(fig_rank, use_container_width=True)
+
+    # Month-wise downtime trend
+    with col_h2:
+        st.markdown("#### Month-wise Downtime Trend")
+        if filtered_df.empty or filtered_df["Date"].isna().all():
+            st.info("No data for trend.")
+        else:
+            trend_df = filtered_df.copy()
+            trend_df["Month"] = trend_df["Date"].apply(lambda d: d.replace(day=1))
+            trend = (
+                trend_df.groupby("Month")["Time Consumed"]
+                .sum()
+                .reset_index()
+                .sort_values("Month")
+            )
+            fig_trend = px.line(
+                trend,
+                x="Month",
+                y="Time Consumed",
+                markers=True,
+                labels={"Time Consumed": "Downtime (min)", "Month": "Month"},
+            )
+            fig_trend.update_layout(height=350, margin=dict(l=10, r=10, t=40, b=10))
+            st.plotly_chart(fig_trend, use_container_width=True)
+
+    st.markdown("#### Breakdown Category Distribution")
+    if filtered_df.empty:
+        st.info("No data for category distribution.")
+    else:
+        cat_df = (
+            filtered_df.groupby("Breakdown Category")["Time Consumed"]
+            .sum()
+            .reset_index()
+        )
+        fig_pie = px.pie(
+            cat_df,
+            names="Breakdown Category",
+            values="Time Consumed",
+            color="Breakdown Category",
+            color_discrete_map=CATEGORY_COLORS,
+        )
+        fig_pie.update_layout(height=350, margin=dict(l=10, r=10, t=40, b=10))
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+    st.markdown("#### Hour-of-Day Breakdown Heatmap")
+    if filtered_df.empty:
+        st.info("No data for heatmap.")
+    else:
+        heat_df = filtered_df.copy()
+        heat_df["Hour"] = heat_df["Start Time"].apply(get_hour_from_time)
+        heat_df = heat_df.dropna(subset=["Hour"])
+        if heat_df.empty:
+            st.info("Start Time not available for heatmap.")
+        else:
+            pivot_heat = (
+                heat_df.groupby(["Machine No", "Hour"])["Time Consumed"]
+                .sum()
+                .reset_index()
+            )
+            pivot_heat = pivot_heat.pivot(index="Machine No", columns="Hour", values="Time Consumed").fillna(0)
+            pivot_heat = pivot_heat.reindex(index=MACHINES, fill_value=0)
+            fig_heat = px.imshow(
+                pivot_heat,
+                labels=dict(x="Hour of Day", y="Machine", color="Downtime (min)"),
+                aspect="auto",
+                color_continuous_scale="Blues",
+            )
+            fig_heat.update_layout(height=500, margin=dict(l=10, r=10, t=40, b=10))
+            st.plotly_chart(fig_heat, use_container_width=True)
+
+
+# =========================
+# TEAM CONTRIBUTION TAB
+# =========================
+with tab_team:
+    st.subheader("Team Contribution & Technician Workload")
+
+    col_t1, col_t2 = st.columns(2)
+
+    with col_t1:
+        st.markdown("#### Technician Workload Ranking")
+        if filtered_df.empty or filtered_df["Technician / Performed By"].isna().all():
+            st.info("No technician data available.")
+        else:
+            tech_df = (
+                filtered_df.groupby("Technician / Performed By")["Time Consumed"]
+                .sum()
+                .reset_index()
+                .sort_values("Time Consumed", ascending=False)
+            )
+            fig_tech = px.bar(
+                tech_df,
+                x="Technician / Performed By",
+                y="Time Consumed",
+                labels={"Time Consumed": "Downtime (min)", "Technician / Performed By": "Technician"},
+                color="Time Consumed",
+                color_continuous_scale="Greens",
+            )
+            fig_tech.update_layout(height=350, margin=dict(l=10, r=10, t=40, b=10), xaxis_tickangle=-45)
+            st.plotly_chart(fig_tech, use_container_width=True)
+
+    with col_t2:
+        st.markdown("#### Technician Breakdown Count")
+        if filtered_df.empty or filtered_df["Technician / Performed By"].isna().all():
+            st.info("No technician data available.")
+        else:
+            tech_count_df = (
+                filtered_df.groupby("Technician / Performed By")["Date"]
+                .count()
+                .reset_index()
+                .rename(columns={"Date": "Breakdown Count"})
+                .sort_values("Breakdown Count", ascending=False)
+            )
+            fig_tech_cnt = px.bar(
+                tech_count_df,
+                x="Technician / Performed By",
+                y="Breakdown Count",
+                labels={"Breakdown Count": "No. of Jobs", "Technician / Performed By": "Technician"},
+                color="Breakdown Count",
+                color_continuous_scale="Bluered",
+            )
+            fig_tech_cnt.update_layout(height=350, margin=dict(l=10, r=10, t=40, b=10), xaxis_tickangle=-45)
+            st.plotly_chart(fig_tech_cnt, use_container_width=True)
+
+    st.markdown("#### Open Jobs by Technician")
+    if filtered_df.empty:
+        st.info("No data.")
+    else:
+        open_df = filtered_df[filtered_df["Status"] == "OPEN"]
+        if open_df.empty:
+            st.success("No open jobs. Great work!")
+        else:
+            st.dataframe(
+                open_df[
+                    [
+                        "Date",
+                        "Machine No",
+                        "Technician / Performed By",
+                        "Breakdown Category",
+                        "Job Type",
+                        "Reported Problem",
+                        "Time Consumed",
+                    ]
+                ].sort_values("Date", ascending=False),
+                use_container_width=True,
+                height=350,
+            )
+
+
+# =========================
+# DATA ENTRY TAB
+# =========================
+with tab_entry:
+    st.subheader("Data Entry & File Upload")
+
+    st.markdown("### Operator Breakdown Entry")
+    if st.button("➕ Add Breakdown Entry", type="primary", use_container_width=True):
+        breakdown_form_dialog()
+
+    st.markdown("### Upload Daily Breakdown Excel/CSV File")
+    uploaded_file = st.file_uploader(
+        "📌 Upload Daily Breakdown Excel/CSV File",
+        type=["xlsx", "xls", "csv"],
+        help="System will auto-detect columns, clean data, calculate Time Consumed, and append to breakdown_log.csv",
+    )
+
+    if uploaded_file is not None:
+        try:
+            if uploaded_file.name.lower().endswith(".csv"):
+                upload_df = pd.read_csv(uploaded_file)
+            else:
+                upload_df = pd.read_excel(uploaded_file)
+
+            st.write("Preview of uploaded file:")
+            st.dataframe(upload_df.head(), use_container_width=True)
+
+            normalized = normalize_columns(upload_df)
+            normalized["Date"] = pd.to_datetime(normalized["Date"], errors="coerce").dt.date
+            normalized = compute_time_for_df(normalized)
+
+            # Fill missing machine classification from mapping
+            normalized["Machine Classification"] = normalized.apply(
+                lambda r: r["Machine Classification"]
+                if pd.notna(r["Machine Classification"])
+                else DEFAULT_CLASS.get(str(r["Machine No"]), ""),
+                axis=1,
+            )
+
+            # Default status if missing
+            normalized["Status"] = normalized["Status"].fillna("CLOSED")
+
+            # Drop rows without Machine or Date
+            normalized = normalized.dropna(subset=["Machine No", "Date"])
+
+            if normalized.empty:
+                st.warning("No valid rows detected after cleaning.")
+            else:
+                if st.button("Append Uploaded Records", type="primary"):
+                    df = st.session_state.df
+                    df = pd.concat([df, normalized], ignore_index=True)
+                    st.session_state.df = df
+                    save_data(df)
+                    st.success(f"Appended {len(normalized)} records to breakdown_log.csv")
+                    st.rerun()
+        except Exception as e:
+            st.error(f"Error processing uploaded file: {e}")
