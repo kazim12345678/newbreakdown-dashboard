@@ -1,239 +1,294 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-from io import BytesIO
-from datetime import datetime, date, time, timedelta
-from streamlit_autorefresh import st_autorefresh
 import os
+from datetime import datetime
 
-# =========================
-# BASIC CONFIG
-# =========================
+# ================================
+# CONFIG
+# ================================
 st.set_page_config(
-    page_title="KUTE – Kazim Utilization & Team Efficiency Dashboard",
-    layout="wide",
+    page_title="NADEC Maintenance Breakdown Dashboard",
+    layout="wide"
 )
 
-st.markdown(
-    """
-    <style>
-    .main {padding-top: 0rem;}
-    .block-container {padding-top: 1rem; padding-bottom: 1rem;}
-    .kpi-card {
-        padding: 0.8rem 1rem;
-        border-radius: 0.5rem;
-        background-color: #f5f7fa;
-        border: 1px solid #d9e2ec;
-    }
-    .kpi-title {
-        font-size: 0.8rem;
-        color: #627d98;
-        font-weight: 600;
-        text-transform: uppercase;
-    }
-    .kpi-value {
-        font-size: 1.4rem;
-        font-weight: 700;
-        color: #102a43;
-    }
-    .kpi-sub {
-        font-size: 0.75rem;
-        color: #829ab1;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+DATA_FILE = "breakdown_log.csv"
 
-CSV_PATH = "breakdown_log.csv"
 MACHINES = [f"M{i}" for i in range(1, 19)]
 
-DEFAULT_CLASS = {
-    "M1": "Filler", "M2": "Filler", "M3": "Filler", "M4": "Packer",
-    "M5": "Packer", "M6": "Packer", "M7": "Labeler", "M8": "Labeler",
-    "M9": "Labeler", "M10": "Filler", "M11": "Packer", "M12": "Labeler",
-    "M13": "Filler", "M14": "Packer", "M15": "Labeler", "M16": "Filler",
-    "M17": "Packer", "M18": "Labeler",
-}
+# ================================
+# AUTO COLUMN FIX FUNCTION
+# ================================
+def standardize_columns(df):
+    """
+    Fix wrong/missing column names automatically
+    """
 
-REQUIRED_COLUMNS = [
-    "Date","Machine No","Shift","Machine Classification","Job Type",
-    "Breakdown Category","Reported Problem","Description of Work",
-    "Start Time","End Time","Time Consumed","Technician / Performed By","Status"
-]
+    df.columns = [c.strip() for c in df.columns]
 
-CATEGORY_COLORS = {
-    "Mechanical": "red",
-    "Electrical": "blue",
-    "Automation": "green",
-}
+    mapping = {
+        "Machine": "Machine No",
+        "MachineNo": "Machine No",
+        "Line": "Machine No",
 
-# =========================
-# STORAGE
-# =========================
-def init_storage():
-    if not os.path.exists(CSV_PATH):
-        df = pd.DataFrame(columns=REQUIRED_COLUMNS)
-        df.to_csv(CSV_PATH, index=False)
+        "Technician": "Performed By",
+        "Technician Name": "Performed By",
+        "Engineer": "Performed By",
 
-def load_data():
-    init_storage()
-    df = pd.read_csv(CSV_PATH)
+        "Duration": "Time Consumed",
+        "TimeTaken": "Time Consumed",
+        "Downtime": "Time Consumed",
 
-    for col in REQUIRED_COLUMNS:
+        "Category": "Breakdown Category",
+        "Type": "Job Type",
+
+        "Problem": "Reported Problem",
+        "Work Done": "Description of Work",
+    }
+
+    df.rename(columns=mapping, inplace=True)
+
+    required_cols = [
+        "Date",
+        "Machine No",
+        "Shift",
+        "Machine Classification",
+        "Job Type",
+        "Breakdown Category",
+        "Reported Problem",
+        "Description of Work",
+        "Start Time",
+        "End Time",
+        "Time Consumed",
+        "Performed By"
+    ]
+
+    # Add missing columns
+    for col in required_cols:
         if col not in df.columns:
-            df[col] = np.nan
-
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
-    df["Start Time"] = pd.to_datetime(df["Start Time"], errors="coerce").dt.time
-    df["End Time"] = pd.to_datetime(df["End Time"], errors="coerce").dt.time
-    df["Time Consumed"] = pd.to_numeric(df["Time Consumed"], errors="coerce")
+            df[col] = ""
 
     return df
 
-def save_data(df):
-    df.to_csv(CSV_PATH, index=False)
 
-def ensure_session_state():
-    if "df" not in st.session_state:
-        st.session_state.df = load_data()
-    if "last_refresh" not in st.session_state:
-        st.session_state.last_refresh = datetime.now()
-
-# =========================
-# TIME UTILS
-# =========================
-def parse_time_str(t):
-    if isinstance(t, time):
-        return t
-    if pd.isna(t):
-        return None
-    for fmt in ("%H:%M", "%H:%M:%S", "%I:%M %p"):
-        try:
-            return datetime.strptime(str(t), fmt).time()
-        except:
-            pass
-    return None
-
-def calculate_time_consumed(start_t, end_t):
-    s = parse_time_str(start_t)
-    e = parse_time_str(end_t)
-    if not s or not e:
-        return np.nan
-    dt_start = datetime.combine(date.today(), s)
-    dt_end = datetime.combine(date.today(), e)
-    if dt_end < dt_start:
-        dt_end += timedelta(days=1)
-    return (dt_end - dt_start).total_seconds() / 60
-
-def get_mtd_data(df):
-    if df.empty:
-        return df
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
-    today = date.today()
-    start_month = date(today.year, today.month, 1)
-    return df[(df["Date"] >= start_month) & (df["Date"] <= today)]
-
-def get_hour_from_time(t):
-    if isinstance(t, time):
-        return t.hour
-    tt = parse_time_str(t)
-    return tt.hour if tt else np.nan
-
-# =========================
-# FILTER UTILS
-# =========================
-def filter_data(df, date_range, machines, category, tech, job_type):
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
-
-    if date_range:
-        start, end = date_range
-        df = df[(df["Date"] >= start) & (df["Date"] <= end)]
-    if machines:
-        df = df[df["Machine No"].isin(machines)]
-    if category != "All":
-        df = df[df["Breakdown Category"] == category]
-    if tech:
-        df = df[df["Technician / Performed By"].astype(str).str.contains(tech, case=False, na=False)]
-    if job_type != "All":
-        df = df[df["Job Type"] == job_type]
-
-    return df
-
-# =========================
-# EXPORT UTILS
-# =========================
-def export_excel(df):
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False)
-    return output.getvalue()
-
-def export_pdf(df):
+# ================================
+# TIME CONVERSION
+# ================================
+def time_to_minutes(t):
     try:
-        from reportlab.lib.pagesizes import A4
-        from reportlab.pdfgen import canvas
-        from reportlab.lib.units import cm
+        if pd.isna(t) or str(t).strip() == "":
+            return 0
+        parts = str(t).split(":")
+        if len(parts) == 3:
+            h, m, s = parts
+            return int(h) * 60 + int(m)
+        elif len(parts) == 2:
+            m, s = parts
+            return int(m)
+        return 0
+    except:
+        return 0
 
-        buffer = BytesIO()
-        c = canvas.Canvas(buffer, pagesize=A4)
-        width, height = A4
-        x_margin = 1.5 * cm
-        y = height - 2 * cm
 
-        c.setFont("Helvetica-Bold", 14)
-        c.drawString(x_margin, y, "KUTE – Maintenance Breakdown Report")
-        y -= 1 * cm
+# ================================
+# LOAD DATA
+# ================================
+def load_data():
+    if os.path.exists(DATA_FILE):
+        df = pd.read_csv(DATA_FILE)
+        df = standardize_columns(df)
+        return df
+    else:
+        return pd.DataFrame(columns=[
+            "Date", "Machine No", "Shift",
+            "Machine Classification", "Job Type",
+            "Breakdown Category", "Reported Problem",
+            "Description of Work", "Start Time",
+            "End Time", "Time Consumed", "Performed By"
+        ])
 
-        c.setFont("Helvetica", 8)
-        cols = ["Date","Machine No","Shift","Job Type","Breakdown Category",
-                "Reported Problem","Time Consumed","Technician / Performed By","Status"]
-        col_widths = [2,1.5,1.5,2,2,5,2,3,2]
 
-        x = x_margin
-        for col, w in zip(cols, col_widths):
-            c.drawString(x, y, col)
-            x += w * cm
-        y -= 0.5 * cm
+# ================================
+# SAVE DATA
+# ================================
+def save_data(df):
+    df.to_csv(DATA_FILE, index=False)
 
-        for _, row in df[cols].fillna("").iterrows():
-            if y < 2 * cm:
-                c.showPage()
-                y = height - 2 * cm
-                c.setFont("Helvetica", 8)
-            x = x_margin
-            for col, w in zip(cols, col_widths):
-                text = str(row[col])
-                if len(text) > 40:
-                    text = text[:37] + "..."
-                c.drawString(x, y, text)
-                x += w * cm
-            y -= 0.4 * cm
 
-        c.save()
-        pdf = buffer.getvalue()
-        buffer.close()
-        return pdf, None
+# ================================
+# APP TITLE
+# ================================
+st.markdown(
+    """
+    <h1 style='text-align:center;color:#003366;'>
+    KUTE Dashboard (Kazim Utilization Team Efficiency)
+    </h1>
+    """,
+    unsafe_allow_html=True
+)
+
+st.write("### NADEC Style Maintenance Breakdown Monitoring System")
+
+# ================================
+# LOAD EXISTING DATA
+# ================================
+df = load_data()
+
+# ================================
+# SIDEBAR UPLOAD EXCEL
+# ================================
+st.sidebar.header("📤 Upload Daily Excel File")
+
+uploaded = st.sidebar.file_uploader(
+    "Upload Breakdown Excel",
+    type=["xlsx", "csv"]
+)
+
+if uploaded:
+    try:
+        if uploaded.name.endswith(".csv"):
+            new_df = pd.read_csv(uploaded)
+        else:
+            new_df = pd.read_excel(uploaded)
+
+        new_df = standardize_columns(new_df)
+
+        df = pd.concat([df, new_df], ignore_index=True)
+        save_data(df)
+
+        st.sidebar.success("✅ File Uploaded & Saved Successfully!")
+
     except Exception as e:
-        return None, str(e)
+        st.sidebar.error("Upload Failed")
+        st.sidebar.write(e)
 
-# =========================
-# AUTO REFRESH
-# =========================
-def auto_refresh_block():
-    refresh_interval = 120
-    elapsed = (datetime.now() - st.session_state.last_refresh).total_seconds()
-    remaining = max(0, refresh_interval - int(elapsed))
+# ================================
+# KPI SUMMARY
+# ================================
+st.markdown("## 📊 KPI Summary")
 
-    col1, col2 = st.columns([3,1])
-    with col1:
-        st.caption("Dashboard auto-refreshes every 2 minutes.")
-    with col2:
-        st.metric("Next refresh (sec)", remaining)
+total_events = len(df)
 
-    if elapsed >= refresh_interval:
-        st.session_state.last_refresh = datetime.now()
+total_minutes = df["Time Consumed"].apply(time_to_minutes).sum()
+total_hours = round(total_minutes / 60, 2)
 
-st_autorefresh(interval=120000, key="kute_refresh")
+worst_machine = "N/A"
+if total_events > 0:
+    worst_machine = (
+        df.groupby("Machine No")["Time Consumed"]
+        .apply(lambda x: x.apply(time_to_minutes).sum())
+        .idxmax()
+    )
+
+col1, col2, col3 = st.columns(3)
+
+col1.metric("Total Breakdown Events", total_events)
+col2.metric("Total Downtime Hours", total_hours)
+col3.metric("Worst Machine", worst_machine)
+
+# ================================
+# MACHINE WISE BAR CHART
+# ================================
+st.markdown("## 🚦 Machine Breakdown Status (M1–M18)")
+
+machine_summary = (
+    df.groupby("Machine No")["Time Consumed"]
+    .apply(lambda x: x.apply(time_to_minutes).sum())
+    .reindex(MACHINES, fill_value=0)
+)
+
+st.bar_chart(machine_summary)
+
+# ================================
+# ADD NEW ENTRY FORM
+# ================================
+st.markdown("## ➕ Add Breakdown Entry")
+
+with st.expander("Click Here to Add Entry"):
+
+    with st.form("entry_form"):
+
+        date = st.date_input("Date", datetime.today())
+
+        machine = st.selectbox("Machine No", MACHINES)
+
+        shift = st.selectbox("Shift", ["Day", "Night"])
+
+        classification = st.text_input("Machine Classification")
+
+        job_type = st.selectbox("Job Type", ["B/D", "Corrective"])
+
+        category = st.selectbox(
+            "Breakdown Category",
+            ["Mechanical", "Electrical", "Automation"]
+        )
+
+        problem = st.text_area("Reported Problem")
+
+        work = st.text_area("Description of Work")
+
+        start = st.text_input("Start Time (HH:MM)")
+        end = st.text_input("End Time (HH:MM)")
+
+        time_consumed = st.text_input("Time Consumed (HH:MM:SS)", "00:10:00")
+
+        technician = st.text_input("Performed By")
+
+        submitted = st.form_submit_button("✅ Save Entry")
+
+        if submitted:
+            new_row = {
+                "Date": date,
+                "Machine No": machine,
+                "Shift": shift,
+                "Machine Classification": classification,
+                "Job Type": job_type,
+                "Breakdown Category": category,
+                "Reported Problem": problem,
+                "Description of Work": work,
+                "Start Time": start,
+                "End Time": end,
+                "Time Consumed": time_consumed,
+                "Performed By": technician
+            }
+
+            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+            save_data(df)
+
+            st.success("✅ Breakdown Entry Saved!")
+
+# ================================
+# DAILY LOG TABLE + DELETE
+# ================================
+st.markdown("## 📋 Breakdown Daily Log Table")
+
+st.dataframe(df, use_container_width=True)
+
+st.markdown("### 🗑 Delete Record")
+
+if len(df) > 0:
+    delete_index = st.number_input(
+        "Enter Row Number to Delete",
+        min_value=0,
+        max_value=len(df) - 1,
+        step=1
+    )
+
+    if st.button("Delete Selected Row"):
+        df = df.drop(delete_index).reset_index(drop=True)
+        save_data(df)
+        st.success("✅ Record Deleted Successfully!")
+        st.rerun()
+
+# ================================
+# EXPORT OPTIONS
+# ================================
+st.markdown("## 📥 Export Data")
+
+st.download_button(
+    "Download CSV",
+    df.to_csv(index=False),
+    "breakdown_export.csv",
+    "text/csv"
+)
+
+st.success("Dashboard Running Successfully ✅")
