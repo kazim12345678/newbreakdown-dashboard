@@ -3,112 +3,43 @@ import pandas as pd
 import sqlite3
 from datetime import datetime, timedelta
 import hashlib
-import random
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib import colors
+from reportlab.platypus import Table
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import inch
+import os
+import smtplib
+from email.mime.text import MIMEText
 
 # =========================================
 # CONFIG
 # =========================================
-st.set_page_config(page_title="KUTE Enterprise CMMS", layout="wide")
+st.set_page_config(page_title="KUTE Enterprise CMMS+", layout="wide")
+
 DB_FILE = "kute_enterprise.db"
 MACHINES = [f"M{i}" for i in range(1, 19)]
+
+# =========================================
+# DARK MODE TOGGLE
+# =========================================
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
+
+dark_toggle = st.sidebar.toggle("🌙 Dark Mode")
+
+if dark_toggle:
+    st.markdown("""
+        <style>
+        body { background-color: #111 !important; color: white !important; }
+        </style>
+    """, unsafe_allow_html=True)
 
 # =========================================
 # DATABASE
 # =========================================
 conn = sqlite3.connect(DB_FILE, check_same_thread=False)
-c = conn.cursor()
-
-# USERS TABLE
-c.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT,
-    password TEXT,
-    role TEXT
-)
-""")
-
-# BREAKDOWNS TABLE
-c.execute("""
-CREATE TABLE IF NOT EXISTS breakdowns (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date TEXT,
-    machine TEXT,
-    category TEXT,
-    problem TEXT,
-    downtime INTEGER,
-    technician TEXT,
-    status TEXT,
-    start_time TEXT,
-    end_time TEXT
-)
-""")
-
-# PM TABLE
-c.execute("""
-CREATE TABLE IF NOT EXISTS pm_schedule (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    machine TEXT,
-    pm_type TEXT,
-    last_done TEXT,
-    next_due TEXT,
-    status TEXT
-)
-""")
-
-conn.commit()
-
-# =========================================
-# CREATE DEFAULT USERS
-# =========================================
-def hash_pwd(p):
-    return hashlib.sha256(p.encode()).hexdigest()
-
-def create_default_users():
-    c.execute("SELECT COUNT(*) FROM users")
-    if c.fetchone()[0] == 0:
-        users = [
-            ("admin", hash_pwd("1234"), "Admin"),
-            ("manager", hash_pwd("1111"), "Manager"),
-            ("ali", hash_pwd("0000"), "Technician"),
-        ]
-        c.executemany("INSERT INTO users (username,password,role) VALUES (?,?,?)", users)
-        conn.commit()
-
-create_default_users()
-
-# =========================================
-# LOGIN SYSTEM
-# =========================================
-if "logged" not in st.session_state:
-    st.session_state.logged = False
-
-if not st.session_state.logged:
-    st.title("🔐 KUTE Enterprise Login")
-
-    user = st.text_input("Username")
-    pwd = st.text_input("Password", type="password")
-
-    if st.button("Login"):
-        hashed = hash_pwd(pwd)
-        result = c.execute(
-            "SELECT role FROM users WHERE username=? AND password=?",
-            (user, hashed)
-        ).fetchone()
-
-        if result:
-            st.session_state.logged = True
-            st.session_state.role = result[0]
-            st.session_state.username = user
-            st.rerun()
-        else:
-            st.error("Invalid Credentials")
-
-    st.stop()
-
-# =========================================
-# LOAD DATA
-# =========================================
 df = pd.read_sql("SELECT * FROM breakdowns", conn)
 pm_df = pd.read_sql("SELECT * FROM pm_schedule", conn)
 
@@ -127,8 +58,8 @@ availability = round((mtbf / (mtbf + mttr)) * 100, 2) if mtbf+mttr > 0 else 0
 # =========================================
 # HEADER
 # =========================================
-st.title("KUTE Enterprise CMMS")
-st.write(f"Logged in as: **{st.session_state.username} ({st.session_state.role})**")
+st.title("KUTE Enterprise CMMS+")
+st.subheader("Executive Maintenance Intelligence System")
 
 k1, k2, k3, k4, k5 = st.columns(5)
 k1.metric("Total Breakdown", total)
@@ -137,11 +68,25 @@ k3.metric("MTTR (min)", mttr)
 k4.metric("MTBF (min)", mtbf)
 k5.metric("Availability %", availability)
 
-st.divider()
+# =========================================
+# ALERT SYSTEM
+# =========================================
+if open_jobs > 10:
+    st.error("⚠ High number of open jobs!")
+
+today = datetime.today().date()
+
+if not pm_df.empty:
+    pm_df["next_due"] = pd.to_datetime(pm_df["next_due"]).dt.date
+    overdue = pm_df[pm_df["next_due"] < today]
+
+    if not overdue.empty:
+        st.warning("⚠ Some PM tasks are overdue!")
 
 # =========================================
 # MACHINE STATUS TILES
 # =========================================
+st.divider()
 st.subheader("Machine Status Overview")
 
 cols = st.columns(6)
@@ -158,98 +103,64 @@ for i, machine in enumerate(MACHINES):
         color = "green"
 
     with cols[i % 6]:
-        if st.button(machine):
-            st.session_state.selected_machine = machine
-
         st.markdown(
             f"<div style='background:{color};padding:15px;border-radius:10px;color:white;text-align:center;font-weight:bold;'>{machine}<br>{downtime} min</div>",
             unsafe_allow_html=True
         )
 
 # =========================================
-# MACHINE DETAIL VIEW
+# PDF EXPORT FUNCTION
 # =========================================
-if "selected_machine" in st.session_state:
-    sm = st.session_state.selected_machine
-    st.subheader(f"Breakdowns for {sm}")
-    machine_df = df[df["machine"] == sm]
-    st.dataframe(machine_df)
+def generate_pdf():
+    file_path = "KUTE_Report.pdf"
+    doc = SimpleDocTemplate(file_path)
+    elements = []
 
-# =========================================
-# ADD BREAKDOWN (Admin & Technician Only)
-# =========================================
-if st.session_state.role in ["Admin", "Technician"]:
+    styles = getSampleStyleSheet()
+    elements.append(Paragraph("KUTE Maintenance Report", styles["Title"]))
+    elements.append(Spacer(1, 0.5 * inch))
 
-    st.divider()
-    st.subheader("Add Breakdown")
+    data = [
+        ["Total Breakdown", total],
+        ["Open Jobs", open_jobs],
+        ["MTTR", mttr],
+        ["MTBF", mtbf],
+        ["Availability %", availability]
+    ]
 
-    with st.form("add_form"):
-        date = st.date_input("Date", datetime.today())
-        machine = st.selectbox("Machine", MACHINES)
-        category = st.selectbox("Category", ["Mechanical", "Electrical", "Automation"])
-        problem = st.text_input("Problem")
-        downtime = st.number_input("Downtime (minutes)", 0)
-        technician = st.text_input("Technician")
-        status = st.selectbox("Status", ["Open", "Solved"])
+    table = Table(data)
+    elements.append(table)
 
-        submit = st.form_submit_button("Save")
+    doc.build(elements)
+    return file_path
 
-        if submit:
-            c.execute("""
-            INSERT INTO breakdowns 
-            (date,machine,category,problem,downtime,technician,status,start_time,end_time)
-            VALUES (?,?,?,?,?,?,?,?,?)
-            """, (date,machine,category,problem,downtime,technician,status,"",""))
-            conn.commit()
-            st.success("Saved")
-            st.rerun()
+if st.button("📄 Generate PDF Report"):
+    pdf_path = generate_pdf()
+    with open(pdf_path, "rb") as f:
+        st.download_button("Download Report", f, file_name="KUTE_Report.pdf")
 
 # =========================================
-# PM MODULE
+# EMAIL ALERT FUNCTION (SMTP READY)
 # =========================================
-st.divider()
-st.subheader("Preventive Maintenance (PM)")
+def send_email_alert():
+    sender = "your_email@gmail.com"
+    password = "your_app_password"
+    receiver = "manager_email@gmail.com"
 
-today = datetime.today().date()
+    msg = MIMEText("KUTE Alert: High open jobs or PM overdue.")
+    msg["Subject"] = "KUTE Maintenance Alert"
+    msg["From"] = sender
+    msg["To"] = receiver
 
-if st.session_state.role == "Admin":
+    server = smtplib.SMTP("smtp.gmail.com", 587)
+    server.starttls()
+    server.login(sender, password)
+    server.send_message(msg)
+    server.quit()
 
-    with st.form("pm_form"):
-        machine = st.selectbox("Machine for PM", MACHINES)
-        pm_type = st.selectbox("PM Type", ["Weekly", "Monthly"])
-        last_done = st.date_input("Last Done", today)
+if st.button("📧 Send Alert Email"):
+    st.info("Configure SMTP credentials in code to enable real email sending.")
+    # Uncomment below after adding real credentials
+    # send_email_alert()
 
-        next_due = last_done + timedelta(days=7 if pm_type=="Weekly" else 30)
-
-        if st.form_submit_button("Schedule PM"):
-            c.execute("""
-            INSERT INTO pm_schedule 
-            (machine,pm_type,last_done,next_due,status)
-            VALUES (?,?,?,?,?)
-            """, (machine,pm_type,last_done,next_due,"Scheduled"))
-            conn.commit()
-            st.success("PM Scheduled")
-            st.rerun()
-
-if not pm_df.empty:
-    pm_df["next_due"] = pd.to_datetime(pm_df["next_due"]).dt.date
-    pm_df["status"] = pm_df["next_due"].apply(
-        lambda x: "Overdue" if x < today else "Upcoming"
-    )
-
-    st.dataframe(pm_df)
-
-# =========================================
-# DELETE RECORD (Admin Only)
-# =========================================
-if st.session_state.role == "Admin":
-    st.divider()
-    st.subheader("Delete Breakdown Record")
-
-    delete_id = st.number_input("Enter Breakdown ID", 0)
-
-    if st.button("Delete"):
-        c.execute("DELETE FROM breakdowns WHERE id=?", (delete_id,))
-        conn.commit()
-        st.success("Deleted")
-        st.rerun()
+st.success("Enterprise+ System Running Successfully")
