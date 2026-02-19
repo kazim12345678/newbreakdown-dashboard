@@ -1,10 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from io import StringIO
-from streamlit_autorefresh import st_autorefresh
 
 # =========================
 # BASIC CONFIG
@@ -59,23 +57,6 @@ st.markdown(
     .kute-timer {
         font-weight: 600;
         color: #facc15;
-    }
-    .kute-btn {
-        background: #1e293b;
-        border: 1px solid #334155;
-        color: #e5e7eb;
-        padding: 0.25rem 0.7rem;
-        border-radius: 0.35rem;
-        font-size: 0.75rem;
-        cursor: pointer;
-    }
-    .kute-btn:hover {
-        background: #111827;
-    }
-    .kute-toggle-label {
-        font-size: 0.75rem;
-        color: #9ca3af;
-        margin-right: 0.3rem;
     }
     .ticker-container {
         margin-top: 0.4rem;
@@ -135,9 +116,6 @@ st.markdown(
     .kute-row {
         background: #020617;
     }
-    .kute-row:nth-child(even) {
-        background: #020617;
-    }
     .kute-row:hover {
         background: #111827;
     }
@@ -194,23 +172,6 @@ st.markdown(
 )
 
 # =========================
-# SESSION & AUTO REFRESH
-# =========================
-def ensure_session_state():
-    if "df" not in st.session_state:
-        st.session_state.df = generate_mock_data()
-    if "last_refresh" not in st.session_state:
-        st.session_state.last_refresh = datetime.now()
-    if "view_mode" not in st.session_state:
-        st.session_state.view_mode = "MTD"
-
-def auto_refresh_block():
-    refresh_interval = 90  # seconds for countdown display
-    elapsed = (datetime.now() - st.session_state.last_refresh).total_seconds()
-    remaining = max(0, refresh_interval - int(elapsed))
-    return remaining
-
-# =========================
 # MOCK DATA GENERATOR
 # =========================
 def generate_mock_data():
@@ -259,6 +220,26 @@ def generate_mock_data():
             }
         )
     return pd.DataFrame(rows)
+
+# =========================
+# SESSION & AUTO REFRESH
+# =========================
+def ensure_session_state():
+    if "df" not in st.session_state:
+        st.session_state.df = generate_mock_data()
+    if "last_refresh" not in st.session_state:
+        st.session_state.last_refresh = datetime.now()
+    if "view_mode" not in st.session_state:
+        st.session_state.view_mode = "MTD"
+
+def auto_refresh_block():
+    refresh_interval = 60  # seconds
+    elapsed = (datetime.now() - st.session_state.last_refresh).total_seconds()
+    remaining = max(0, refresh_interval - int(elapsed))
+    if elapsed >= refresh_interval:
+        st.session_state.last_refresh = datetime.now()
+        st.experimental_rerun()
+    return remaining
 
 # =========================
 # TICKER TEXT BUILDER
@@ -324,12 +305,9 @@ def render_complaints_bar(row):
 # MAIN APP
 # =========================
 ensure_session_state()
-
-# Auto-refresh every 60 seconds
-st_autorefresh = st_autorefresh(interval=60000, key="kute_autorefresh")
-
 remaining = auto_refresh_block()
 now = datetime.now()
+df = st.session_state.df
 
 # HEADER
 col_header = st.container()
@@ -371,6 +349,7 @@ if upload_clicked:
             data = uploaded.read().decode("utf-8")
             df_new = pd.read_csv(StringIO(data))
             st.session_state.df = df_new
+            df = df_new
             st.success("Data uploaded and loaded into KUTE.")
         except Exception as e:
             st.error(f"Error reading uploaded file: {e}")
@@ -381,7 +360,6 @@ if save_clicked:
 
 # HISTORY CARD
 if history_clicked:
-    df = st.session_state.df
     avg_pe = df["PE"].mean()
     avg_oe = df["OE"].mean()
     avg_ou = df["OU"].mean()
@@ -393,7 +371,6 @@ if history_clicked:
     )
 
 # TICKER
-df = st.session_state.df
 ticker_html = build_ticker_text(df)
 st.markdown(
     f"""
@@ -406,7 +383,7 @@ st.markdown(
 
 st.markdown("")
 
-# EDITABLE DATA BUTTON
+# EDITABLE DATA
 edit_mode = st.checkbox("Edit KUTE Data (st.data_editor)", value=False)
 if edit_mode:
     edited_df = st.data_editor(df, use_container_width=True, num_rows="dynamic")
@@ -462,7 +439,6 @@ table_html += "</tbody></table>"
 
 st.markdown(table_html, unsafe_allow_html=True)
 
-# SMALL LEGEND
 st.markdown(
     """
     <div style="margin-top:0.4rem; font-size:0.7rem; color:#9ca3af;">
