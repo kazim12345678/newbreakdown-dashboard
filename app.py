@@ -1,218 +1,196 @@
-import streamlit as st
-import pandas as pd
-import datetime
-import os
+You are an expert CMMS developer and Streamlit dashboard engineer.
 
-# ============================
-# CONFIG
-# ============================
-st.set_page_config(
-    page_title="NADEC CUTE Maintenance Dashboard",
-    layout="wide"
-)
+Build a COMPLETE Streamlit Maintenance Breakdown Dashboard system like NADEC CUTE.
 
-DATA_FILE = "breakdown_log.csv"
+I want ONE single file code: app.py
 
-MACHINES = [f"M{i}" for i in range(1, 19)]
+This dashboard must work for 18 production machines (M1 to M18).
 
-# Required Columns (Fix for old CSV)
-REQUIRED_COLUMNS = [
-    "Date", "Machine", "Shift", "Classification",
-    "JobType", "Category",
-    "Problem", "WorkDone",
-    "StartTime", "EndTime",
-    "Downtime_Minutes",
-    "Technician",
-    "Status"
-]
+====================================================
+MAIN GOAL
+====================================================
 
-# ============================
-# LOAD / SAVE FUNCTIONS
-# ============================
-def load_data():
-    # If file exists, load it
-    if os.path.exists(DATA_FILE):
-        df = pd.read_csv(DATA_FILE)
+Create a real-time maintenance KPI system where:
 
-        # ✅ Auto-Fix Missing Columns
-        for col in REQUIRED_COLUMNS:
-            if col not in df.columns:
-                df[col] = ""
+✅ Operators can enter breakdown jobs daily  
+✅ Management can track machine status live  
+✅ Breakdown types are color-coded  
+✅ Clicking machine shows breakdown details  
+✅ Dashboard updates automatically  
+✅ Export to Excel/CSV/PDF is available  
 
-        return df
+====================================================
+DATA STORAGE
+====================================================
 
-    # If no file exists, create fresh structure
-    else:
-        return pd.DataFrame(columns=REQUIRED_COLUMNS)
+Use permanent local storage:
 
+- breakdown_log.csv
 
-def save_data(df):
-    df.to_csv(DATA_FILE, index=False)
+The file must auto-create if missing.
 
+====================================================
+DATA STRUCTURE
+====================================================
 
-df = load_data()
+Each breakdown record must contain:
 
-# ============================
-# HEADER
-# ============================
-st.markdown("""
-<style>
-.big-title {
-    font-size:35px;
-    font-weight:800;
-    color:#003366;
-}
-.kpi-box {
-    padding:15px;
-    border-radius:15px;
-    background:white;
-    box-shadow:0px 3px 10px rgba(0,0,0,0.15);
-    text-align:center;
-}
-</style>
-""", unsafe_allow_html=True)
+- Date  
+- Machine No (M1–M18)
+- Shift (Day/Night)
+- Machine Classification (Filler, Packer, Labeler etc.)
+- Job Type (Breakdown B/D or Corrective)
+- Breakdown Category (Mechanical, Electrical, Automation)
+- Reported Problem
+- Description of Work
+- Start Time
+- End Time
+- Time Consumed (auto-calculated)
+- Technician / Performed By
+- Status (OPEN or CLOSED)
 
-st.markdown("<div class='big-title'>🏭 NADEC CUTE Maintenance Breakdown Dashboard</div>", unsafe_allow_html=True)
-st.write("Real-time Machine Breakdown Tracking | Operator Entry | KPI Analytics")
+====================================================
+REQUIRED DASHBOARD UI STYLE
+====================================================
 
-st.divider()
+Make UI similar to NADEC CUTE screen:
 
-# ============================
-# KPI SUMMARY
-# ============================
-total_events = len(df)
+Top Header Title:
 
-# Convert downtime safely
-df["Downtime_Minutes"] = pd.to_numeric(df["Downtime_Minutes"], errors="coerce").fillna(0)
+"KUTE – Kazim Utilization & Team Efficiency Dashboard"
 
-total_downtime = df["Downtime_Minutes"].sum()
+Navigation Tabs:
 
-worst_machine = "-"
-if total_events > 0:
-    worst_machine = df.groupby("Machine")["Downtime_Minutes"].sum().idxmax()
+1. Home
+2. Breakdown Reports
+3. Machine History
+4. Team Contribution
+5. Data Entry
 
-top_tech = "-"
-if total_events > 0:
-    top_tech = df.groupby("Technician")["Downtime_Minutes"].sum().idxmax()
+====================================================
+1. HOME TAB – LIVE MACHINE STATUS BARS
+====================================================
 
-col1, col2, col3, col4 = st.columns(4)
+Show 18 horizontal machine bars (M1–M18):
 
-col1.markdown(f"<div class='kpi-box'><h4>Total Events</h4><h2>{total_events}</h2></div>", unsafe_allow_html=True)
-col2.markdown(f"<div class='kpi-box'><h4>Total Downtime (min)</h4><h2>{total_downtime:.0f}</h2></div>", unsafe_allow_html=True)
-col3.markdown(f"<div class='kpi-box'><h4>Worst Machine</h4><h2>{worst_machine}</h2></div>", unsafe_allow_html=True)
-col4.markdown(f"<div class='kpi-box'><h4>Top Technician</h4><h2>{top_tech}</h2></div>", unsafe_allow_html=True)
+- Y-axis = Machine name
+- X-axis = Total downtime minutes
 
-st.divider()
+Bars must be stacked and color-coded:
 
-# ============================
-# CURRENT REAL-TIME BREAKDOWN BAR
-# ============================
-st.subheader("🚨 Current Active Breakdowns (Real-Time OPEN Jobs)")
+Red = Mechanical
+Blue = Electrical
+Green = Automation
 
-# Fix empty status
-df["Status"] = df["Status"].fillna("CLOSED")
+Each bar represents current downtime MTD.
 
-active_df = df[df["Status"] == "OPEN"]
+Clicking a machine bar must open breakdown detail table
+for that machine.
 
-if len(active_df) == 0:
-    st.success("✅ No Active Breakdown Right Now")
-else:
-    st.dataframe(active_df, use_container_width=True)
+====================================================
+2. DATA ENTRY BUTTON (HIDDEN FORM)
+====================================================
 
-st.divider()
+Show only a button:
 
-# ============================
-# OPERATOR ENTRY FORM
-# ============================
-with st.expander("➕ Add New Breakdown Entry (Operator Form)", expanded=False):
+➕ Add Breakdown Entry
 
-    with st.form("entry_form"):
+When clicked → open operator entry form.
 
-        date = st.date_input("Date", datetime.date.today())
-        machine = st.selectbox("Machine", MACHINES)
+After saving → dashboard updates immediately.
 
-        shift = st.radio("Shift", ["Day", "Night"], horizontal=True)
+====================================================
+3. CSV / EXCEL UPLOAD OPTION
+====================================================
 
-        classification = st.text_input("Machine Classification (Filler, Packer...)")
+Add upload section:
 
-        jobtype = st.selectbox("Job Type", ["Breakdown (B/D)", "Corrective"])
+📌 Upload Daily Breakdown Excel File
 
-        category = st.selectbox("Breakdown Category", ["Mechanical", "Electrical", "Automation"])
+If uploaded, system should automatically:
 
-        problem = st.text_area("Reported Problem")
-        workdone = st.text_area("Description of Work Done")
+- detect column names even if spelling differs
+- clean the data
+- calculate Time Consumed
+- append records into breakdown_log.csv
 
-        start_time = st.time_input("Start Time", datetime.datetime.now().time())
-        end_time = st.time_input("End Time", datetime.datetime.now().time())
+====================================================
+4. DAILY LOG TABLE (Editable)
+====================================================
 
-        technician = st.text_input("Technician Name")
+Show full breakdown log table:
 
-        status = st.selectbox("Status", ["OPEN", "CLOSED"])
+- Editable in Streamlit
+- Each row has Delete button
+- Each row has Edit button
 
-        submitted = st.form_submit_button("💾 Save Breakdown Entry")
+====================================================
+5. KPI CARDS
+====================================================
 
-        if submitted:
-            dt_start = datetime.datetime.combine(date, start_time)
-            dt_end = datetime.datetime.combine(date, end_time)
+Show KPI summary:
 
-            downtime = (dt_end - dt_start).total_seconds() / 60
-            if downtime < 0:
-                downtime = 0
+- Total Downtime Hours
+- Total Breakdown Events
+- Worst Machine
+- Worst Month
+- Top Technician Contributor
+- Pending Jobs Count
 
-            new_row = {
-                "Date": date,
-                "Machine": machine,
-                "Shift": shift,
-                "Classification": classification,
-                "JobType": jobtype,
-                "Category": category,
-                "Problem": problem,
-                "WorkDone": workdone,
-                "StartTime": start_time,
-                "EndTime": end_time,
-                "Downtime_Minutes": downtime,
-                "Technician": technician,
-                "Status": status
-            }
+====================================================
+6. FILTERS
+====================================================
 
-            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-            save_data(df)
+Add filters:
 
-            st.success("✅ Breakdown Entry Saved Successfully!")
-            st.rerun()
+- Date Range
+- Machine Selection
+- Breakdown Category
+- Technician Name
+- Job Type
 
-st.divider()
+====================================================
+7. ANALYTICS CHARTS
+====================================================
 
-# ============================
-# MACHINE WISE BAR CHART (M1–M18)
-# ============================
-st.subheader("⚙️ Machine Downtime Summary (M1–M18)")
+Include charts:
 
-machine_summary = df.groupby("Machine")["Downtime_Minutes"].sum().reindex(MACHINES, fill_value=0)
+- Machine-wise downtime ranking (M1–M18)
+- Month-wise downtime trend
+- Technician workload ranking
+- Breakdown category pie chart
+- Hour-of-day breakdown heatmap (0–23)
 
-st.bar_chart(machine_summary)
+====================================================
+8. AUTO REFRESH
+====================================================
 
-st.divider()
+Dashboard should auto-refresh every 2 minutes
+with countdown display.
 
-# ============================
-# FULL DAILY LOG TABLE
-# ============================
-st.subheader("📋 Full Breakdown Daily Log Sheet")
+====================================================
+9. EXPORT OPTIONS
+====================================================
 
-st.dataframe(df, use_container_width=True)
+Provide buttons:
 
-st.divider()
+- Download CSV
+- Download Excel
+- Download PDF Report
 
-# ============================
-# EXPORT OPTIONS
-# ============================
-st.subheader("📤 Export Reports")
+====================================================
+OUTPUT RULES
+====================================================
 
-st.download_button(
-    "⬇️ Download CSV Report",
-    df.to_csv(index=False),
-    file_name="breakdown_report.csv",
-    mime="text/csv"
-)
+- Give FULL working Streamlit app.py code
+- Must run directly:
 
-st.success("✅ NADEC Dashboard Running Perfectly")
+streamlit run app.py
+
+- Mobile-friendly layout
+- Professional NADEC style UI
+- No HTML pasted incorrectly into Python
+- Use Plotly for interactive charts
+- Use st.dialog or st.expander for breakdown detail popup
+
+Now generate the complete app.py code.
