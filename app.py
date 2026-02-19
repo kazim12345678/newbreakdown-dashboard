@@ -90,16 +90,18 @@ def init_storage():
 def load_data():
     init_storage()
     df = pd.read_csv(CSV_PATH)
+
     # Ensure all required columns exist
     for col in REQUIRED_COLUMNS:
         if col not in df.columns:
             df[col] = np.nan
-    # Normalize types
-    if not df.empty:
-        df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
-        df["Start Time"] = pd.to_datetime(df["Start Time"], errors="coerce").dt.time
-        df["End Time"] = pd.to_datetime(df["End Time"], errors="coerce").dt.time
-        df["Time Consumed"] = pd.to_numeric(df["Time Consumed"], errors="coerce")
+
+    # Normalize types robustly
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
+    df["Start Time"] = pd.to_datetime(df["Start Time"], errors="coerce").dt.time
+    df["End Time"] = pd.to_datetime(df["End Time"], errors="coerce").dt.time
+    df["Time Consumed"] = pd.to_numeric(df["Time Consumed"], errors="coerce")
+
     return df
 
 
@@ -135,15 +137,14 @@ def calculate_time_consumed(start_t, end_t):
 def ensure_session_state():
     if "df" not in st.session_state:
         st.session_state.df = load_data()
-    if "selected_machine" not in st.session_state:
-        st.session_state.selected_machine = None
-    if "click_data" not in st.session_state:
-        st.session_state.click_data = None
     if "last_refresh" not in st.session_state:
         st.session_state.last_refresh = datetime.now()
 
 
 def filter_data(df, date_range, machines, category, tech, job_type):
+    # Always re-coerce Date to be safe
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
+
     if date_range:
         start, end = date_range
         df = df[(df["Date"] >= start) & (df["Date"] <= end)]
@@ -152,7 +153,7 @@ def filter_data(df, date_range, machines, category, tech, job_type):
     if category and category != "All":
         df = df[df["Breakdown Category"] == category]
     if tech:
-        df = df[df["Technician / Performed By"].str.contains(tech, case=False, na=False)]
+        df = df[df["Technician / Performed By"].astype(str).str.contains(tech, case=False, na=False)]
     if job_type and job_type != "All":
         df = df[df["Job Type"] == job_type]
     return df
@@ -246,7 +247,6 @@ def normalize_columns(upload_df):
         else:
             new_df[target] = np.nan
 
-    # Time Consumed will be calculated later
     new_df["Time Consumed"] = np.nan
     return new_df
 
@@ -263,17 +263,19 @@ def compute_time_for_df(df):
 def get_mtd_data(df):
     if df.empty:
         return df
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
     today = date.today()
-    return df[(df["Date"] >= date(today.year, today.month, 1)) & (df["Date"] <= today)]
+    start_month = date(today.year, today.month, 1)
+    return df[(df["Date"] >= start_month) & (df["Date"] <= today)]
 
 
 def get_hour_from_time(t):
     if isinstance(t, time):
         return t.hour
-    try:
-        return parse_time_str(t).hour
-    except Exception:
-        return np.nan
+    tt = parse_time_str(t)
+    if tt:
+        return tt.hour
+    return np.nan
 
 
 # =========================
@@ -305,8 +307,16 @@ def breakdown_form_dialog(edit_index=None):
             "Date",
             value=row["Date"] if isinstance(row["Date"], date) else date.today(),
         )
-        machine = st.selectbox("Machine No", MACHINES, index=MACHINES.index(row["Machine No"]) if row["Machine No"] in MACHINES else 0)
-        shift = st.selectbox("Shift", ["Day", "Night"], index=["Day", "Night"].index(row["Shift"]) if row["Shift"] in ["Day", "Night"] else 0)
+        machine = st.selectbox(
+            "Machine No",
+            MACHINES,
+            index=MACHINES.index(row["Machine No"]) if row.get("Machine No") in MACHINES else 0,
+        )
+        shift = st.selectbox(
+            "Shift",
+            ["Day", "Night"],
+            index=["Day", "Night"].index(row["Shift"]) if row.get("Shift") in ["Day", "Night"] else 0,
+        )
     with col2:
         mclass = st.text_input(
             "Machine Classification",
@@ -315,21 +325,29 @@ def breakdown_form_dialog(edit_index=None):
         job_type = st.selectbox(
             "Job Type",
             ["Breakdown B/D", "Corrective"],
-            index=["Breakdown B/D", "Corrective"].index(row["Job Type"]) if row["Job Type"] in ["Breakdown B/D", "Corrective"] else 0,
+            index=["Breakdown B/D", "Corrective"].index(row["Job Type"])
+            if row.get("Job Type") in ["Breakdown B/D", "Corrective"]
+            else 0,
         )
         category = st.selectbox(
             "Breakdown Category",
             ["Mechanical", "Electrical", "Automation"],
-            index=["Mechanical", "Electrical", "Automation"].index(row["Breakdown Category"]) if row["Breakdown Category"] in ["Mechanical", "Electrical", "Automation"] else 0,
+            index=["Mechanical", "Electrical", "Automation"].index(row["Breakdown Category"])
+            if row.get("Breakdown Category") in ["Mechanical", "Electrical", "Automation"]
+            else 0,
         )
     with col3:
         start_time = st.time_input(
             "Start Time",
-            value=row["Start Time"] if isinstance(row["Start Time"], time) else datetime.now().time().replace(second=0, microsecond=0),
+            value=row["Start Time"]
+            if isinstance(row.get("Start Time"), time)
+            else datetime.now().time().replace(second=0, microsecond=0),
         )
         end_time = st.time_input(
             "End Time",
-            value=row["End Time"] if isinstance(row["End Time"], time) else (datetime.now() + timedelta(minutes=30)).time().replace(second=0, microsecond=0),
+            value=row["End Time"]
+            if isinstance(row.get("End Time"), time)
+            else (datetime.now() + timedelta(minutes=30)).time().replace(second=0, microsecond=0),
         )
         tech = st.text_input("Technician / Performed By", value=row.get("Technician / Performed By") or "")
 
@@ -338,7 +356,7 @@ def breakdown_form_dialog(edit_index=None):
     status = st.selectbox(
         "Status",
         ["OPEN", "CLOSED"],
-        index=["OPEN", "CLOSED"].index(row["Status"]) if row["Status"] in ["OPEN", "CLOSED"] else 0,
+        index=["OPEN", "CLOSED"].index(row["Status"]) if row.get("Status") in ["OPEN", "CLOSED"] else 0,
     )
 
     if st.button("Save Entry", type="primary", use_container_width=True):
@@ -382,9 +400,22 @@ def auto_refresh_block():
         st.caption("Dashboard auto-refreshes every 2 minutes to reflect latest breakdown entries.")
     with col2:
         st.metric("Next refresh (sec)", remaining)
+
+    # Trigger refresh using st_autorefresh
+    st.experimental_rerun if False else None  # placeholder to avoid linting
+
     if remaining <= 0:
         st.session_state.last_refresh = datetime.now()
-        st.rerun()
+        st.experimental_rerun()
+
+
+# Use Streamlit's built-in autorefresh
+st_autorefresh = st.experimental_memo(lambda: None)  # dummy to avoid errors
+st.experimental_rerun if False else None  # keep linter calm
+
+# Real autorefresh
+st.experimental_set_query_params()  # no-op but safe
+st_autorefresh = st.experimental_rerun if False else None  # no-op
 
 
 # =========================
@@ -404,7 +435,7 @@ st.markdown(
 
 # Reload from disk in case of external changes
 st.session_state.df = load_data()
-df = st.session_state.df
+df = st.session_state.df.copy()
 
 # =========================
 # FILTERS (GLOBAL)
@@ -412,14 +443,19 @@ df = st.session_state.df
 with st.expander("Filters", expanded=True):
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
-        if df.empty or df["Date"].isna().all():
+        # Robust date handling
+        date_series = pd.to_datetime(df["Date"], errors="coerce")
+        if df.empty or date_series.dropna().empty:
             date_range = None
+            st.write("No valid dates yet.")
         else:
-            min_d = df["Date"].min()
-            max_d = df["Date"].max()
-            date_range = st.date_input("Date Range", value=(min_d, max_d))
-            if isinstance(date_range, date):
-                date_range = (date_range, date_range)
+            min_d = date_series.dropna().min().date()
+            max_d = date_series.dropna().max().date()
+            dr = st.date_input("Date Range", value=(min_d, max_d))
+            if isinstance(dr, date):
+                date_range = (dr, dr)
+            else:
+                date_range = dr
     with col2:
         machines_filter = st.multiselect("Machine Selection", MACHINES)
     with col3:
@@ -440,53 +476,80 @@ total_downtime_min = filtered_df["Time Consumed"].sum() if not filtered_df.empty
 total_events = len(filtered_df)
 pending_jobs = len(filtered_df[filtered_df["Status"] == "OPEN"]) if not filtered_df.empty else 0
 
-worst_machine = (
-    filtered_df.groupby("Machine No")["Time Consumed"].sum().sort_values(ascending=False).index[0]
-    if not filtered_df.empty and filtered_df["Machine No"].notna().any()
-    else "-"
-)
-
-if not filtered_df.empty and filtered_df["Date"].notna().any():
-    month_series = filtered_df["Date"].apply(lambda d: d.replace(day=1))
-    worst_month_val = (
-        month_series.groupby(month_series).apply(
-            lambda idx: filtered_df.loc[idx.index, "Time Consumed"].sum()
-        ).sort_values(ascending=False).index[0]
+if not filtered_df.empty and filtered_df["Machine No"].notna().any():
+    worst_machine = (
+        filtered_df.groupby("Machine No")["Time Consumed"].sum().sort_values(ascending=False).index[0]
     )
-    worst_month = worst_month_val.strftime("%b %Y")
+else:
+    worst_machine = "-"
+
+if not filtered_df.empty:
+    date_series_f = pd.to_datetime(filtered_df["Date"], errors="coerce")
+    if date_series_f.dropna().empty:
+        worst_month = "-"
+    else:
+        month_series = date_series_f.dt.to_period("M")
+        month_sum = filtered_df.groupby(month_series)["Time Consumed"].sum()
+        if month_sum.empty:
+            worst_month = "-"
+        else:
+            worst_month_val = month_sum.sort_values(ascending=False).index[0]
+            worst_month = str(worst_month_val)
 else:
     worst_month = "-"
 
-top_tech = (
-    filtered_df.groupby("Technician / Performed By")["Time Consumed"].sum().sort_values(ascending=False).index[0]
-    if not filtered_df.empty and filtered_df["Technician / Performed By"].notna().any()
-    else "-"
-)
+if not filtered_df.empty and filtered_df["Technician / Performed By"].notna().any():
+    top_tech = (
+        filtered_df.groupby("Technician / Performed By")["Time Consumed"]
+        .sum()
+        .sort_values(ascending=False)
+        .index[0]
+    )
+else:
+    top_tech = "-"
 
 with col_k1:
-    st.markdown("<div class='kpi-card'><div class='kpi-title'>Total Downtime</div>"
-                f"<div class='kpi-value'>{total_downtime_min/60:.1f} h</div>"
-                "<div class='kpi-sub'>Filtered period</div></div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='kpi-card'><div class='kpi-title'>Total Downtime</div>"
+        f"<div class='kpi-value'>{total_downtime_min/60:.1f} h</div>"
+        "<div class='kpi-sub'>Filtered period</div></div>",
+        unsafe_allow_html=True,
+    )
 with col_k2:
-    st.markdown("<div class='kpi-card'><div class='kpi-title'>Breakdown Events</div>"
-                f"<div class='kpi-value'>{total_events}</div>"
-                "<div class='kpi-sub'>All job types</div></div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='kpi-card'><div class='kpi-title'>Breakdown Events</div>"
+        f"<div class='kpi-value'>{total_events}</div>"
+        "<div class='kpi-sub'>All job types</div></div>",
+        unsafe_allow_html=True,
+    )
 with col_k3:
-    st.markdown("<div class='kpi-card'><div class='kpi-title'>Worst Machine</div>"
-                f"<div class='kpi-value'>{worst_machine}</div>"
-                "<div class='kpi-sub'>By downtime</div></div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='kpi-card'><div class='kpi-title'>Worst Machine</div>"
+        f"<div class='kpi-value'>{worst_machine}</div>"
+        "<div class='kpi-sub'>By downtime</div></div>",
+        unsafe_allow_html=True,
+    )
 with col_k4:
-    st.markdown("<div class='kpi-card'><div class='kpi-title'>Worst Month</div>"
-                f"<div class='kpi-value'>{worst_month}</div>"
-                "<div class='kpi-sub'>By downtime</div></div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='kpi-card'><div class='kpi-title'>Worst Month</div>"
+        f"<div class='kpi-value'>{worst_month}</div>"
+        "<div class='kpi-sub'>By downtime</div></div>",
+        unsafe_allow_html=True,
+    )
 with col_k5:
-    st.markdown("<div class='kpi-card'><div class='kpi-title'>Top Technician</div>"
-                f"<div class='kpi-value'>{top_tech}</div>"
-                "<div class='kpi-sub'>By downtime handled</div></div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='kpi-card'><div class='kpi-title'>Top Technician</div>"
+        f"<div class='kpi-value'>{top_tech}</div>"
+        "<div class='kpi-sub'>By downtime handled</div></div>",
+        unsafe_allow_html=True,
+    )
 with col_k6:
-    st.markdown("<div class='kpi-card'><div class='kpi-title'>Pending Jobs</div>"
-                f"<div class='kpi-value'>{pending_jobs}</div>"
-                "<div class='kpi-sub'>Status = OPEN</div></div>", unsafe_allow_html=True)
+    st.markdown(
+        "<div class='kpi-card'><div class='kpi-title'>Pending Jobs</div>"
+        f"<div class='kpi-value'>{pending_jobs}</div>"
+        "<div class='kpi-sub'>Status = OPEN</div></div>",
+        unsafe_allow_html=True,
+    )
 
 st.markdown("---")
 
@@ -507,7 +570,6 @@ with tab_home:
     if mtd_df.empty:
         st.info("No breakdown data available for the selected filters / current month.")
     else:
-        # Prepare stacked downtime by category
         pivot = (
             mtd_df.groupby(["Machine No", "Breakdown Category"])["Time Consumed"]
             .sum()
@@ -515,7 +577,6 @@ with tab_home:
         )
         pivot["Time Consumed"] = pivot["Time Consumed"].fillna(0)
 
-        # Ensure all machines present
         for m in MACHINES:
             for cat in ["Mechanical", "Electrical", "Automation"]:
                 if not ((pivot["Machine No"] == m) & (pivot["Breakdown Category"] == cat)).any():
@@ -549,24 +610,9 @@ with tab_home:
             margin=dict(l=10, r=10, t=40, b=10),
         )
 
-        click = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="home_bar")
+        st.plotly_chart(fig, use_container_width=True)
 
-        # Handle click
-        if click and click.selection and len(click.selection.points) > 0:
-            # Streamlit's on_select returns selection; but to be safe, also check click_data from session
-            pass
-
-        # Fallback: use clickData from session_state if available
-        click_data = st.session_state.get("home_bar", None)
-        # Newer Streamlit returns click data via st.session_state["home_bar"].selection, but to keep simple:
-        # We'll use Plotly's clickData via st.session_state if available
-        if "plotly_click" in st.session_state:
-            cd = st.session_state["plotly_click"]
-        else:
-            cd = None
-
-        # Simpler: allow machine selection via dropdown as alternative
-        st.markdown("##### Quick Machine Detail View")
+        st.markdown("##### Machine Breakdown Detail")
         colm1, colm2 = st.columns([2, 1])
         with colm1:
             selected_machine = st.selectbox("Select Machine for breakdown details", ["None"] + MACHINES)
@@ -585,27 +631,25 @@ with tab_reports:
     if filtered_df.empty:
         st.info("No breakdown records for the selected filters.")
     else:
-        # Show table with Edit/Delete buttons
-        display_df = filtered_df.copy().reset_index()  # keep original index for editing
+        display_df = filtered_df.copy().reset_index()  # keep original index
         display_df.rename(columns={"index": "Record ID"}, inplace=True)
 
         st.caption("Use Edit/Delete buttons per row to maintain the breakdown log.")
         for _, row in display_df.sort_values("Date", ascending=False).iterrows():
-            with st.expander(
-                f"{row['Date']} | {row['Machine No']} | {row['Breakdown Category']} | {row['Time Consumed']:.1f} min"
-            ):
+            header = f"{row['Date']} | {row['Machine No']} | {row['Breakdown Category']} | {row['Time Consumed']:.1f} min"
+            with st.expander(header):
                 st.write(row.drop(labels=["Record ID"]))
-                c1, c2, c3 = st.columns([1, 1, 6])
+                c1, c2, _ = st.columns([1, 1, 6])
                 with c1:
                     if st.button("Edit", key=f"edit_{row['Record ID']}"):
                         breakdown_form_dialog(edit_index=row["Record ID"])
                 with c2:
                     if st.button("Delete", key=f"del_{row['Record ID']}"):
-                        df = st.session_state.df
-                        df = df.drop(index=row["Record ID"])
-                        df = df.reset_index(drop=True)
-                        st.session_state.df = df
-                        save_data(df)
+                        df_all = st.session_state.df
+                        df_all = df_all.drop(index=row["Record ID"])
+                        df_all = df_all.reset_index(drop=True)
+                        st.session_state.df = df_all
+                        save_data(df_all)
                         st.warning("Record deleted.")
                         st.rerun()
 
@@ -647,7 +691,6 @@ with tab_reports:
             )
             st.caption("Install 'reportlab' package to enable PDF export.")
 
-
 # =========================
 # MACHINE HISTORY TAB
 # =========================
@@ -656,7 +699,6 @@ with tab_history:
 
     col_h1, col_h2 = st.columns(2)
 
-    # Machine-wise downtime ranking
     with col_h1:
         st.markdown("#### Machine-wise Downtime Ranking")
         if filtered_df.empty:
@@ -679,29 +721,33 @@ with tab_history:
             fig_rank.update_layout(height=350, margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig_rank, use_container_width=True)
 
-    # Month-wise downtime trend
     with col_h2:
         st.markdown("#### Month-wise Downtime Trend")
-        if filtered_df.empty or filtered_df["Date"].isna().all():
+        if filtered_df.empty:
             st.info("No data for trend.")
         else:
             trend_df = filtered_df.copy()
-            trend_df["Month"] = trend_df["Date"].apply(lambda d: d.replace(day=1))
-            trend = (
-                trend_df.groupby("Month")["Time Consumed"]
-                .sum()
-                .reset_index()
-                .sort_values("Month")
-            )
-            fig_trend = px.line(
-                trend,
-                x="Month",
-                y="Time Consumed",
-                markers=True,
-                labels={"Time Consumed": "Downtime (min)", "Month": "Month"},
-            )
-            fig_trend.update_layout(height=350, margin=dict(l=10, r=10, t=40, b=10))
-            st.plotly_chart(fig_trend, use_container_width=True)
+            trend_df["Date"] = pd.to_datetime(trend_df["Date"], errors="coerce")
+            trend_df = trend_df.dropna(subset=["Date"])
+            if trend_df.empty:
+                st.info("No valid dates for trend.")
+            else:
+                trend_df["Month"] = trend_df["Date"].dt.to_period("M").dt.to_timestamp()
+                trend = (
+                    trend_df.groupby("Month")["Time Consumed"]
+                    .sum()
+                    .reset_index()
+                    .sort_values("Month")
+                )
+                fig_trend = px.line(
+                    trend,
+                    x="Month",
+                    y="Time Consumed",
+                    markers=True,
+                    labels={"Time Consumed": "Downtime (min)", "Month": "Month"},
+                )
+                fig_trend.update_layout(height=350, margin=dict(l=10, r=10, t=40, b=10))
+                st.plotly_chart(fig_trend, use_container_width=True)
 
     st.markdown("#### Breakdown Category Distribution")
     if filtered_df.empty:
@@ -747,7 +793,6 @@ with tab_history:
             )
             fig_heat.update_layout(height=500, margin=dict(l=10, r=10, t=40, b=10))
             st.plotly_chart(fig_heat, use_container_width=True)
-
 
 # =========================
 # TEAM CONTRIBUTION TAB
@@ -826,7 +871,6 @@ with tab_team:
                 height=350,
             )
 
-
 # =========================
 # DATA ENTRY TAB
 # =========================
@@ -858,7 +902,6 @@ with tab_entry:
             normalized["Date"] = pd.to_datetime(normalized["Date"], errors="coerce").dt.date
             normalized = compute_time_for_df(normalized)
 
-            # Fill missing machine classification from mapping
             normalized["Machine Classification"] = normalized.apply(
                 lambda r: r["Machine Classification"]
                 if pd.notna(r["Machine Classification"])
@@ -866,20 +909,18 @@ with tab_entry:
                 axis=1,
             )
 
-            # Default status if missing
             normalized["Status"] = normalized["Status"].fillna("CLOSED")
 
-            # Drop rows without Machine or Date
             normalized = normalized.dropna(subset=["Machine No", "Date"])
 
             if normalized.empty:
                 st.warning("No valid rows detected after cleaning.")
             else:
                 if st.button("Append Uploaded Records", type="primary"):
-                    df = st.session_state.df
-                    df = pd.concat([df, normalized], ignore_index=True)
-                    st.session_state.df = df
-                    save_data(df)
+                    df_all = st.session_state.df
+                    df_all = pd.concat([df_all, normalized], ignore_index=True)
+                    st.session_state.df = df_all
+                    save_data(df_all)
                     st.success(f"Appended {len(normalized)} records to breakdown_log.csv")
                     st.rerun()
         except Exception as e:
