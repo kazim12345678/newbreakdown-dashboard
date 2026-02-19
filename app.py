@@ -1,3 +1,7 @@
+**Finalizing app structure**
+
+I’ll make sure `ensure_session_state` sets `last_refresh` if it’s not already in `session_state`. It should be placed before the `auto_refresh_block`, but the `st_autorefresh` call can come earlier since it doesn’t depend on that. The code structure will be: imports, config, constants, utils, dialogs, `auto_refresh_block`, and then `main`. In the `auto_refresh_block`, I’ll calculate the elapsed time and remaining time, updating `last_refresh` when needed. No manual reruns, since `st_autorefresh` will handle that. I’ll also fix the filters block and remove any experimental code. Time to craft the final `app.py`.
+```python
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -5,6 +9,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from io import BytesIO
 from datetime import datetime, date, time, timedelta
+from streamlit_autorefresh import st_autorefresh
 import os
 
 # =========================
@@ -79,7 +84,7 @@ CATEGORY_COLORS = {
 }
 
 # =========================
-# UTILS
+# STORAGE & TYPE HANDLING
 # =========================
 def init_storage():
     if not os.path.exists(CSV_PATH):
@@ -91,12 +96,10 @@ def load_data():
     init_storage()
     df = pd.read_csv(CSV_PATH)
 
-    # Ensure all required columns exist
     for col in REQUIRED_COLUMNS:
         if col not in df.columns:
             df[col] = np.nan
 
-    # Normalize types robustly
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
     df["Start Time"] = pd.to_datetime(df["Start Time"], errors="coerce").dt.time
     df["End Time"] = pd.to_datetime(df["End Time"], errors="coerce").dt.time
@@ -109,6 +112,16 @@ def save_data(df):
     df.to_csv(CSV_PATH, index=False)
 
 
+def ensure_session_state():
+    if "df" not in st.session_state:
+        st.session_state.df = load_data()
+    if "last_refresh" not in st.session_state:
+        st.session_state.last_refresh = datetime.now()
+
+
+# =========================
+# TIME & CALC UTILS
+# =========================
 def parse_time_str(t):
     if isinstance(t, time):
         return t
@@ -134,15 +147,28 @@ def calculate_time_consumed(start_t, end_t):
     return (dt_end - dt_start).total_seconds() / 60.0
 
 
-def ensure_session_state():
-    if "df" not in st.session_state:
-        st.session_state.df = load_data()
-    if "last_refresh" not in st.session_state:
-        st.session_state.last_refresh = datetime.now()
+def get_mtd_data(df):
+    if df.empty:
+        return df
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
+    today = date.today()
+    start_month = date(today.year, today.month, 1)
+    return df[(df["Date"] >= start_month) & (df["Date"] <= today)]
 
 
+def get_hour_from_time(t):
+    if isinstance(t, time):
+        return t.hour
+    tt = parse_time_str(t)
+    if tt:
+        return tt.hour
+    return np.nan
+
+
+# =========================
+# FILTER & EXPORT UTILS
+# =========================
 def filter_data(df, date_range, machines, category, tech, job_type):
-    # Always re-coerce Date to be safe
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
 
     if date_range:
@@ -260,24 +286,6 @@ def compute_time_for_df(df):
     return df
 
 
-def get_mtd_data(df):
-    if df.empty:
-        return df
-    df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
-    today = date.today()
-    start_month = date(today.year, today.month, 1)
-    return df[(df["Date"] >= start_month) & (df["Date"] <= today)]
-
-
-def get_hour_from_time(t):
-    if isinstance(t, time):
-        return t.hour
-    tt = parse_time_str(t)
-    if tt:
-        return tt.hour
-    return np.nan
-
-
 # =========================
 # DIALOGS
 # =========================
@@ -305,7 +313,7 @@ def breakdown_form_dialog(edit_index=None):
     with col1:
         date_val = st.date_input(
             "Date",
-            value=row["Date"] if isinstance(row["Date"], date) else date.today(),
+            value=row["Date"] if isinstance(row.get("Date"), date) else date.today(),
         )
         machine = st.selectbox(
             "Machine No",
@@ -395,28 +403,19 @@ def auto_refresh_block():
     refresh_interval_sec = 120
     elapsed = (datetime.now() - st.session_state.last_refresh).total_seconds()
     remaining = max(0, int(refresh_interval_sec - elapsed))
+
     col1, col2 = st.columns([3, 1])
     with col1:
         st.caption("Dashboard auto-refreshes every 2 minutes to reflect latest breakdown entries.")
     with col2:
         st.metric("Next refresh (sec)", remaining)
 
-    # Trigger refresh using st_autorefresh
-    st.experimental_rerun if False else None  # placeholder to avoid linting
-
-    if remaining <= 0:
+    if elapsed >= refresh_interval_sec:
         st.session_state.last_refresh = datetime.now()
-        st.experimental_rerun()
 
 
-# Use Streamlit's built-in autorefresh
-st_autorefresh = st.experimental_memo(lambda: None)  # dummy to avoid errors
-st.experimental_rerun if False else None  # keep linter calm
-
-# Real autorefresh
-st.experimental_set_query_params()  # no-op but safe
-st_autorefresh = st.experimental_rerun if False else None  # no-op
-
+# Trigger actual rerun every 2 minutes
+st_autorefresh(interval=120000, key="kute_autorefresh")
 
 # =========================
 # MAIN APP
@@ -433,17 +432,15 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Reload from disk in case of external changes
 st.session_state.df = load_data()
 df = st.session_state.df.copy()
 
 # =========================
-# FILTERS (GLOBAL)
+# GLOBAL FILTERS
 # =========================
 with st.expander("Filters", expanded=True):
     col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
-        # Robust date handling
         date_series = pd.to_datetime(df["Date"], errors="coerce")
         if df.empty or date_series.dropna().empty:
             date_range = None
@@ -631,7 +628,7 @@ with tab_reports:
     if filtered_df.empty:
         st.info("No breakdown records for the selected filters.")
     else:
-        display_df = filtered_df.copy().reset_index()  # keep original index
+        display_df = filtered_df.copy().reset_index()
         display_df.rename(columns={"index": "Record ID"}, inplace=True)
 
         st.caption("Use Edit/Delete buttons per row to maintain the breakdown log.")
@@ -910,7 +907,6 @@ with tab_entry:
             )
 
             normalized["Status"] = normalized["Status"].fillna("CLOSED")
-
             normalized = normalized.dropna(subset=["Machine No", "Date"])
 
             if normalized.empty:
@@ -925,3 +921,4 @@ with tab_entry:
                     st.rerun()
         except Exception as e:
             st.error(f"Error processing uploaded file: {e}")
+```
