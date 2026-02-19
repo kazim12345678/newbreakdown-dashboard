@@ -1,304 +1,202 @@
 import streamlit as st
 import pandas as pd
-import os
-from datetime import datetime
+import sqlite3
+from datetime import datetime, timedelta
+import random
 
-# ============================================
+# =========================================
 # CONFIG
-# ============================================
-st.set_page_config(
-    page_title="KUTE Maintenance Dashboard",
-    layout="wide"
-)
+# =========================================
+st.set_page_config(page_title="KUTE CMMS", layout="wide")
 
-DATA_FILE = "breakdown_log.csv"
+DB_FILE = "kute.db"
 MACHINES = [f"M{i}" for i in range(1, 19)]
 
-# ============================================
-# AUTO REFRESH EVERY 2 MINUTES
-# ============================================
-st.markdown("""
-<script>
-setTimeout(function(){
-    window.location.reload();
-}, 120000);
-</script>
-""", unsafe_allow_html=True)
+# =========================================
+# DATABASE INIT
+# =========================================
+conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+c = conn.cursor()
 
-# ============================================
-# HELPER FUNCTIONS
-# ============================================
+c.execute("""
+CREATE TABLE IF NOT EXISTS breakdowns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    date TEXT,
+    machine TEXT,
+    category TEXT,
+    problem TEXT,
+    downtime INTEGER,
+    technician TEXT,
+    status TEXT
+)
+""")
+conn.commit()
 
-def time_to_minutes(t):
-    try:
-        if pd.isna(t) or str(t).strip() == "":
-            return 0
-        parts = str(t).split(":")
-        if len(parts) == 3:
-            h, m, s = parts
-            return int(h) * 60 + int(m)
-        elif len(parts) == 2:
-            h, m = parts
-            return int(h) * 60 + int(m)
-        return 0
-    except:
-        return 0
+# =========================================
+# FAKE DATA GENERATOR (First Run Only)
+# =========================================
+def generate_fake_data():
+    c.execute("SELECT COUNT(*) FROM breakdowns")
+    if c.fetchone()[0] == 0:
+        techs = ["Ali", "Ahmed", "John", "Khalid", "Rashid"]
+        categories = ["Mechanical", "Electrical", "Automation"]
+        statuses = ["Open", "Solved"]
 
+        for _ in range(50):
+            c.execute("""
+            INSERT INTO breakdowns 
+            (date, machine, category, problem, downtime, technician, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                (datetime.today() - timedelta(days=random.randint(0, 30))).strftime("%Y-%m-%d"),
+                random.choice(MACHINES),
+                random.choice(categories),
+                "Sample Issue",
+                random.randint(10, 180),
+                random.choice(techs),
+                random.choice(statuses)
+            ))
+        conn.commit()
 
-def standardize_columns(df):
-    df.columns = [c.strip() for c in df.columns]
+generate_fake_data()
 
-    mapping = {
-        "Machine": "Machine No",
-        "MachineNo": "Machine No",
-        "Line": "Machine No",
-        "Technician": "Performed By",
-        "Duration": "Time Consumed",
-        "Downtime": "Time Consumed",
-        "Category": "Breakdown Category",
-        "Problem": "Reported Problem",
-    }
+# =========================================
+# LOGIN SYSTEM
+# =========================================
+if "logged" not in st.session_state:
+    st.session_state.logged = False
 
-    df.rename(columns=mapping, inplace=True)
+if not st.session_state.logged:
+    st.title("🔐 KUTE Login")
+    user = st.text_input("Username")
+    pwd = st.text_input("Password", type="password")
 
-    required_cols = [
-        "Date", "Machine No", "Shift",
-        "Machine Classification", "Job Type",
-        "Breakdown Category", "Reported Problem",
-        "Description of Work", "Start Time",
-        "End Time", "Time Consumed", "Performed By"
-    ]
+    if st.button("Login"):
+        if user == "admin" and pwd == "1234":
+            st.session_state.logged = True
+            st.rerun()
+        else:
+            st.error("Wrong Credentials")
+    st.stop()
 
-    for col in required_cols:
-        if col not in df.columns:
-            df[col] = ""
-
-    return df
-
-
-def load_data():
-    if os.path.exists(DATA_FILE):
-        df = pd.read_csv(DATA_FILE)
-        return standardize_columns(df)
-    else:
-        return pd.DataFrame(columns=[
-            "Date", "Machine No", "Shift",
-            "Machine Classification", "Job Type",
-            "Breakdown Category", "Reported Problem",
-            "Description of Work", "Start Time",
-            "End Time", "Time Consumed", "Performed By"
-        ])
-
-
-def save_data(df):
-    df.to_csv(DATA_FILE, index=False)
-
-
-# ============================================
+# =========================================
 # LOAD DATA
-# ============================================
-df = load_data()
+# =========================================
+df = pd.read_sql("SELECT * FROM breakdowns", conn)
 
-# ============================================
+# =========================================
 # HEADER STYLE
-# ============================================
+# =========================================
 st.markdown("""
 <style>
-.big-title {
-    font-size:40px;
-    font-weight:bold;
-    color:#003366;
-    text-align:center;
-}
-.sub-title {
-    text-align:center;
-    font-size:18px;
-    color:#555;
-}
-.kpi-box {
-    background-color:#f8f9fa;
+.tile {
     padding:20px;
     border-radius:15px;
     text-align:center;
-    box-shadow: 0px 3px 6px rgba(0,0,0,0.2);
+    font-weight:bold;
+    font-size:18px;
+    color:white;
 }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<div class='big-title'>KUTE Dashboard</div>", unsafe_allow_html=True)
-st.markdown("<div class='sub-title'>Kazim Utilization & Team Efficiency</div>", unsafe_allow_html=True)
+st.title("KUTE CMMS Dashboard")
+
+# =========================================
+# KPI SECTION
+# =========================================
+total = len(df)
+open_jobs = len(df[df["status"] == "Open"])
+solved = len(df[df["status"] == "Solved"])
+
+total_downtime = df["downtime"].sum()
+mttr = round(total_downtime / solved, 2) if solved > 0 else 0
+mtbf = round((30*24*60) / total, 2) if total > 0 else 0
+
+k1, k2, k3, k4 = st.columns(4)
+k1.metric("Total Breakdown", total)
+k2.metric("Open Jobs", open_jobs)
+k3.metric("MTTR (min)", mttr)
+k4.metric("MTBF (min)", mtbf)
 
 st.divider()
 
-# ============================================
-# TABS
-# ============================================
-tabs = st.tabs([
-    "🏠 Home",
-    "📊 Analytics",
-    "📌 Machine History",
-    "👷 Team Contribution",
-    "➕ Data Entry"
-])
+# =========================================
+# MACHINE COLOR TILES
+# =========================================
+st.subheader("Machine Status Overview")
 
-# ============================================
-# HOME TAB
-# ============================================
-with tabs[0]:
+cols = st.columns(6)
 
-    st.subheader("Live Machine Breakdown Status")
+for i, machine in enumerate(MACHINES):
+    machine_data = df[df["machine"] == machine]
+    downtime = machine_data["downtime"].sum()
 
-    total_events = len(df)
-    total_minutes = df["Time Consumed"].apply(time_to_minutes).sum()
-    total_hours = round(total_minutes / 60, 2)
-
-    if total_events > 0:
-        machine_summary = (
-            df.groupby("Machine No")["Time Consumed"]
-            .apply(lambda x: x.apply(time_to_minutes).sum())
-            .reindex(MACHINES, fill_value=0)
-        )
-        worst_machine = machine_summary.idxmax()
+    if downtime > 300:
+        color = "red"
+    elif downtime > 120:
+        color = "orange"
     else:
-        machine_summary = pd.Series(0, index=MACHINES)
-        worst_machine = "N/A"
+        color = "green"
 
-    col1, col2, col3 = st.columns(3)
+    with cols[i % 6]:
+        if st.button(machine):
+            st.session_state.selected_machine = machine
 
-    col1.metric("Total Events", total_events)
-    col2.metric("Total Downtime (Hours)", total_hours)
-    col3.metric("Worst Machine", worst_machine)
-
-    st.divider()
-
-    st.bar_chart(machine_summary)
-
-# ============================================
-# ANALYTICS TAB
-# ============================================
-with tabs[1]:
-
-    st.subheader("Monthly Breakdown Trend")
-
-    if not df.empty:
-        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-        df["Month"] = df["Date"].dt.strftime("%b")
-
-        month_summary = (
-            df.groupby("Month")["Time Consumed"]
-            .apply(lambda x: x.apply(time_to_minutes).sum())
+        st.markdown(
+            f"<div class='tile' style='background:{color};'>{machine}<br>{downtime} min</div>",
+            unsafe_allow_html=True
         )
 
-        st.line_chart(month_summary)
-    else:
-        st.info("No data available.")
+# =========================================
+# CLICKABLE MACHINE POPUP
+# =========================================
+if "selected_machine" in st.session_state:
+    sm = st.session_state.selected_machine
+    st.subheader(f"Breakdowns for {sm}")
 
-    st.divider()
+    machine_df = df[df["machine"] == sm]
+    st.dataframe(machine_df)
 
-    st.subheader("Breakdown Category Distribution")
+# =========================================
+# ADD NEW BREAKDOWN
+# =========================================
+st.divider()
+st.subheader("Add Breakdown")
 
-    if "Breakdown Category" in df.columns:
-        cat_df = df[df["Breakdown Category"].astype(str).str.strip() != ""]
-        cat_summary = cat_df["Breakdown Category"].value_counts()
+with st.form("add_form"):
+    date = st.date_input("Date", datetime.today())
+    machine = st.selectbox("Machine", MACHINES)
+    category = st.selectbox("Category", ["Mechanical", "Electrical", "Automation"])
+    problem = st.text_input("Problem")
+    downtime = st.number_input("Downtime (minutes)", 0)
+    technician = st.text_input("Technician")
+    status = st.selectbox("Status", ["Open", "Solved"])
 
-        if not cat_summary.empty:
-            st.bar_chart(cat_summary)
-        else:
-            st.info("No category data available.")
+    submit = st.form_submit_button("Save")
 
-# ============================================
-# MACHINE HISTORY TAB
-# ============================================
-with tabs[2]:
+    if submit:
+        c.execute("""
+        INSERT INTO breakdowns 
+        (date, machine, category, problem, downtime, technician, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (date, machine, category, problem, downtime, technician, status))
+        conn.commit()
+        st.success("Saved")
+        st.rerun()
 
-    selected_machine = st.selectbox("Select Machine", MACHINES)
+# =========================================
+# EDIT / DELETE
+# =========================================
+st.divider()
+st.subheader("Edit / Delete Records")
 
-    machine_df = df[df["Machine No"] == selected_machine]
+st.dataframe(df)
 
-    st.dataframe(machine_df, use_container_width=True)
+delete_id = st.number_input("Enter ID to Delete", 0)
 
-# ============================================
-# TEAM CONTRIBUTION TAB
-# ============================================
-with tabs[3]:
-
-    if "Performed By" in df.columns:
-        tech_summary = df["Performed By"].value_counts()
-        if not tech_summary.empty:
-            st.bar_chart(tech_summary)
-        else:
-            st.info("No technician data available.")
-
-# ============================================
-# DATA ENTRY TAB
-# ============================================
-with tabs[4]:
-
-    with st.form("entry_form"):
-
-        date = st.date_input("Date", datetime.today())
-        machine = st.selectbox("Machine", MACHINES)
-        shift = st.selectbox("Shift", ["Day", "Night"])
-        category = st.selectbox("Category", ["Mechanical", "Electrical", "Automation"])
-
-        problem = st.text_area("Reported Problem")
-        work = st.text_area("Work Done")
-        time_consumed = st.text_input("Time Consumed (HH:MM:SS)", "00:10:00")
-        technician = st.text_input("Technician")
-
-        submitted = st.form_submit_button("Save Breakdown")
-
-        if submitted:
-
-            new_row = {
-                "Date": date,
-                "Machine No": machine,
-                "Shift": shift,
-                "Machine Classification": "",
-                "Job Type": "B/D",
-                "Breakdown Category": category,
-                "Reported Problem": problem,
-                "Description of Work": work,
-                "Start Time": "",
-                "End Time": "",
-                "Time Consumed": time_consumed,
-                "Performed By": technician
-            }
-
-            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-            save_data(df)
-
-            st.success("Breakdown Saved Successfully")
-            st.rerun()
-
-    st.divider()
-
-    st.subheader("Delete Record")
-
-    if len(df) > 0:
-        delete_index = st.number_input(
-            "Row Number",
-            min_value=0,
-            max_value=len(df)-1,
-            step=1
-        )
-
-        if st.button("Delete Selected Row"):
-            df = df.drop(delete_index).reset_index(drop=True)
-            save_data(df)
-            st.success("Record Deleted")
-            st.rerun()
-
-# ============================================
-# SIDEBAR EXPORT
-# ============================================
-st.sidebar.header("Export")
-
-st.sidebar.download_button(
-    "Download CSV",
-    df.to_csv(index=False),
-    "breakdown_export.csv",
-    "text/csv"
-)
-
-st.sidebar.success("System Running Successfully")
+if st.button("Delete Record"):
+    c.execute("DELETE FROM breakdowns WHERE id = ?", (delete_id,))
+    conn.commit()
+    st.success("Deleted")
+    st.rerun()
