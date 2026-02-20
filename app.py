@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+import matplotlib.pyplot as plt
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import pagesizes
@@ -31,10 +32,9 @@ st.markdown("### Technical Downtime Executive Dashboard | Machines M1 - M18")
 st.markdown("---")
 
 # -----------------------------
-# RAW DATA (YOUR FULL DATA HERE — KEEP SAME)
+# RAW DATA (KEEP YOUR FULL DATA HERE)
 # -----------------------------
 data = [
-# ⬇⬇⬇ KEEP YOUR COMPLETE MACHINE DATA HERE EXACTLY SAME ⬇⬇⬇
 ["M1","Crates delivery stopped-Tech",316],
 ["M1","Filling product valve",112],
 ["M1","Filling Station",70],
@@ -45,13 +45,13 @@ data = [
 ["M1","Possimat",15],
 ["M1","Crates area / conveyors",12],
 ["M1","Crate Stacker",4],
-# ---- KEEP REST OF YOUR DATA UNCHANGED ----
+# 👉 KEEP REST OF YOUR ORIGINAL MACHINE DATA UNCHANGED
 ]
 
 df = pd.DataFrame(data, columns=["Machine","Downtime Type","Minutes"])
 
 # -----------------------------
-# KPIs (SAFE FIX)
+# KPIs (SAFE)
 # -----------------------------
 total_dt = df["Minutes"].sum()
 machines = df["Machine"].nunique()
@@ -73,16 +73,14 @@ st.subheader("🔴 Machine Downtime Ranking")
 
 machine_sum = df.groupby("Machine")["Minutes"].sum().sort_values(ascending=False)
 
-fig1 = px.bar(
-    machine_sum,
-    x=machine_sum.index,
-    y=machine_sum.values,
-    color=machine_sum.values,
-    color_continuous_scale="Reds",
-    text=machine_sum.values
-)
-fig1.update_layout(template="plotly_dark")
+fig1 = px.bar(machine_sum,
+              x=machine_sum.index,
+              y=machine_sum.values,
+              color=machine_sum.values,
+              color_continuous_scale="Reds",
+              text=machine_sum.values)
 
+fig1.update_layout(template="plotly_dark")
 st.plotly_chart(fig1, use_container_width=True)
 
 # -----------------------------
@@ -91,18 +89,16 @@ st.plotly_chart(fig1, use_container_width=True)
 st.subheader("📊 Pareto Analysis - Top 10 Downtime Causes")
 
 cause_sum = df.groupby("Downtime Type")["Minutes"].sum().sort_values(ascending=False)
-pareto_df = cause_sum.reset_index()
+pareto_df = cause_sum.reset_index().head(10)
 
-fig2 = px.bar(
-    pareto_df.head(10),
-    x="Downtime Type",
-    y="Minutes",
-    color="Minutes",
-    color_continuous_scale="Blues",
-    text="Minutes"
-)
+fig2 = px.bar(pareto_df,
+              x="Downtime Type",
+              y="Minutes",
+              color="Minutes",
+              color_continuous_scale="Blues",
+              text="Minutes")
+
 fig2.update_layout(template="plotly_dark", xaxis_tickangle=-45)
-
 st.plotly_chart(fig2, use_container_width=True)
 
 # -----------------------------
@@ -112,7 +108,7 @@ st.subheader("📋 Detailed Downtime Data")
 st.dataframe(df, use_container_width=True)
 
 # -----------------------------
-# PDF GENERATION (WITH CHARTS + KPIs)
+# PROFESSIONAL PDF WITH REAL GRAPHS
 # -----------------------------
 def generate_pdf():
     buffer = io.BytesIO()
@@ -126,32 +122,37 @@ def generate_pdf():
     elements.append(Paragraph(f"Total Downtime: {total_dt} Minutes", styles["Normal"]))
     elements.append(Paragraph(f"Total Machines: {machines}", styles["Normal"]))
     elements.append(Paragraph(f"Highest Downtime Machine: {top_machine}", styles["Normal"]))
-    elements.append(Spacer(1, 0.3 * inch))
+    elements.append(Spacer(1, 0.4 * inch))
 
-    # Save charts as images
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp1:
-        fig1.write_image(tmp1.name)
-        elements.append(Image(tmp1.name, width=6*inch, height=3*inch))
-        elements.append(Spacer(1, 0.3 * inch))
+    # -------- Matplotlib Machine Chart --------
+    plt.figure(figsize=(8,4))
+    machine_sum.plot(kind="bar")
+    plt.title("Machine Downtime Ranking")
+    plt.ylabel("Minutes")
+    plt.tight_layout()
 
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp2:
-        fig2.write_image(tmp2.name)
-        elements.append(Image(tmp2.name, width=6*inch, height=3*inch))
-        elements.append(Spacer(1, 0.3 * inch))
+    tmp1 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    plt.savefig(tmp1.name)
+    plt.close()
 
-    # Add table
-    table_data = [df.columns.tolist()] + df.values.tolist()
-    table = Table(table_data, repeatRows=1)
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.grey),
-        ('TEXTCOLOR',(0,0),(-1,0),colors.whitesmoke),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.black),
-        ('FONTSIZE', (0,0), (-1,-1), 6)
-    ]))
+    elements.append(Image(tmp1.name, width=6*inch, height=3*inch))
+    elements.append(Spacer(1, 0.4 * inch))
 
-    elements.append(table)
+    # -------- Matplotlib Pareto Chart --------
+    plt.figure(figsize=(8,4))
+    pareto_df.set_index("Downtime Type")["Minutes"].plot(kind="bar")
+    plt.title("Top 10 Downtime Causes")
+    plt.ylabel("Minutes")
+    plt.xticks(rotation=45, ha="right")
+    plt.tight_layout()
+
+    tmp2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    plt.savefig(tmp2.name)
+    plt.close()
+
+    elements.append(Image(tmp2.name, width=6*inch, height=3*inch))
+
     doc.build(elements)
-
     buffer.seek(0)
     return buffer
 
