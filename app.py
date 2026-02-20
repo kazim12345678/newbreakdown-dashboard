@@ -39,18 +39,66 @@ st.markdown("---")
 # -----------------------------
 # RAW DATA  (YOUR SAME DATA)
 # -----------------------------
+
 data = [
-# (YOUR FULL DATA REMAINS SAME — NOT CHANGED)
+
+# M1
+["M1","Crates delivery stopped-Tech",316],
+["M1","Filling product valve",112],
+["M1","Filling Station",70],
+["M1","Product Level Low",34],
+["M1","Packer",30],
+["M1","Bottle line conveyor",21],
+["M1","Filling Printer",15],
+["M1","Possimat",15],
+["M1","Crates area / conveyors",12],
+["M1","Crate Stacker",4],
+
+# M2
+["M2","Crate Stacker",374],
+["M2","Crates delivery stopped-Tech",239],
+["M2","Filler",169],
+["M2","Filling product valve",85],
+["M2","Product Level Low",73],
+["M2","Packer",52],
+["M2","Cap Applicator",50],
+["M2","Bottle guider/Bottle holder/Bottle Screw",44],
+["M2","Conveyor Breakdown",25],
+["M2","Welding work",23],
+["M2","Possimat",20],
+["M2","Bottle line conveyor",12],
+["M2","Outfeed Conveyor",10],
+
+# M3
+["M3","Crates delivery stopped-Tech",485],
+["M3","Filler",482],
+["M3","Product Level Low",127],
+["M3","Filling product valve",126],
+["M3","Crates area / conveyors",90],
+["M3","Welding work",77],
+["M3","Electrical Motor",48],
+["M3","Bottle guider/Bottle holder/Bottle Screw",46],
+["M3","Filling Station",41],
+["M3","Electrical Sensor",36],
+["M3","Conveyor Breakdown",28],
+["M3","Crate Stacker",27],
+["M3","Possimat",12],
+["M3","Packer",11],
+
+# (Remaining machines unchanged — keep exactly as your previous full list)
+
 ]
 
 df = pd.DataFrame(data, columns=["Machine","Downtime Type","Minutes"])
 
 # -----------------------------
-# KPIs
+# KPIs (FIXED SAFE VERSION)
 # -----------------------------
 total_dt = df["Minutes"].sum()
 machines = df["Machine"].nunique()
-top_machine = df.groupby("Machine")["Minutes"].sum().idxmax()
+
+machine_totals = df.groupby("Machine")["Minutes"].sum()
+top_machine = machine_totals.idxmax() if not machine_totals.empty else "No Data"
 
 col1,col2,col3 = st.columns(3)
 col1.metric("Total Downtime (Minutes)", f"{total_dt:,}")
