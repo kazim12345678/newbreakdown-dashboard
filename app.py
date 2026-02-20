@@ -13,7 +13,7 @@ import io
 # PAGE CONFIG
 # ----------------------------------------------------
 st.set_page_config(page_title="SERAC DT Analysis", layout="wide")
-st.title("🏭 SERAC DRINKABLE SECTION – Technical Downtime Analysis")
+st.title(" SERAC DRINKABLE SECTION – Technical Downtime Analysis")
 st.markdown("### Mobile‑Friendly Optimized Dashboard")
 st.markdown("---")
 
