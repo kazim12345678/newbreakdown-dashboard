@@ -18,3 +18,10 @@ numpy
 plotly
 streamlit
 kaleido==0.2.1
+streamlit
+pandas
+numpy
+plotly
+kaleido==0.2.1
+xlsxwriter
+openpyxl
