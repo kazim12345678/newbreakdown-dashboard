@@ -6,7 +6,7 @@ import numpy as np
 
 st.set_page_config(page_title="Drinkable KPIs 2025", layout="wide")
 
-st.title("🥤 NADEC Drinkable Maintenance Performance Report – 2025")
+st.title("Drinkable Maintenance Performance Report – 2025")
 st.markdown("#### Breakdown Downtime | Machine Failures | Technician Workload Contribution Dashboard")
 
 # -----------------------------
