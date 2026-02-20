@@ -14,7 +14,7 @@ import io
 # ----------------------------------------------------
 st.set_page_config(page_title="SERAC DT Analysis", layout="wide")
 st.title(" SERAC DRINKABLE SECTION – Technical Downtime Analysis")
-st.markdown("### Mobile‑Friendly Optimized Dashboard")
+st.markdown("### Mr. Omar plese see machine downtime cute report")
 st.markdown("---")
 
 # ----------------------------------------------------
