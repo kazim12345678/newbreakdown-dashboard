@@ -2,85 +2,107 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import numpy as np
 
 st.set_page_config(page_title="Drinkable KPIs 2025", layout="wide")
 
-st.title("🥤 Drinkable KPIs Dashboard – 2025")
-st.markdown("### Breakdown Downtime | Machine Failures | Technician Workload")
+st.title("🥤 NADEC Drinkable Maintenance Performance Report – 2025")
+st.markdown("#### Breakdown Downtime | Machine Failures | Technician Workload Contribution Dashboard")
 
 # -----------------------------
 # KPI CARDS
 # -----------------------------
 kpi_data = {
-    "Total Downtime Hours": 3466,
-    "Total Breakdown Events": 8903,
+    "Total Downtime Hours": "3466",
+    "Total Breakdown Events": "8903",
     "Worst Downtime Month": "July",
     "Highest Breakdown Machine": "M15",
     "Top Technician Contributor": "Dante"
 }
 
-cols = st.columns(5)
-for i, (k, v) in enumerate(kpi_data.items()):
-    with cols[i]:
-        st.metric(k, v)
+kpi_cols = st.columns(len(kpi_data))
+for col, (label, value) in zip(kpi_cols, kpi_data.items()):
+    with col:
+        st.metric(label, value)
+
+st.markdown("---")
 
 # -----------------------------
-# MONTHLY DOWNTIME CHART
+# CHARTS GRID
 # -----------------------------
+st.subheader("📊 High-level Breakdown & Workload Overview")
+
+c1, c2 = st.columns(2)
+
+# Monthly Downtime Hours
 months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 monthly_hours = [285,241,312,222,304,260,446,277,260,327,270,257]
 
-fig1 = px.bar(
-    x=months, y=monthly_hours,
-    labels={"x":"Month", "y":"Downtime Hours"},
-    title="Monthly Downtime Hours"
-)
-st.plotly_chart(fig1, use_container_width=True)
+with c1:
+    fig1 = px.bar(
+        x=months,
+        y=monthly_hours,
+        labels={"x": "Month", "y": "Downtime Hours"},
+        title="Monthly Downtime Hours"
+    )
+    fig1.update_traces(marker_color="#003366")
+    st.plotly_chart(fig1, use_container_width=True)
 
-# -----------------------------
-# TOP MACHINES BREAKDOWN
-# -----------------------------
+# Top Machines Breakdown Count
 machines = ["M15","M7","M1","M14","M2"]
 machine_counts = [963,825,822,805,621]
 
-fig2 = px.bar(
-    x=machine_counts, y=machines,
-    orientation="h",
-    labels={"x":"Breakdown Count", "y":"Machine"},
-    title="Top Machines Breakdown Count"
-)
-st.plotly_chart(fig2, use_container_width=True)
+with c2:
+    fig2 = px.bar(
+        x=machine_counts,
+        y=machines,
+        orientation="h",
+        labels={"x": "Breakdown Count", "y": "Machine"},
+        title="Top Machines Breakdown Count"
+    )
+    fig2.update_traces(marker_color="#cc0000")
+    fig2.update_layout(yaxis=dict(autorange="reversed"))
+    st.plotly_chart(fig2, use_container_width=True)
 
-# -----------------------------
-# TECHNICIAN CONTRIBUTION PIE
-# -----------------------------
+c3, c4 = st.columns(2)
+
+# Technician Contribution Share (Pie)
 tech_labels = ["Dante","Sameer","Gilbert","Lito","Husam","Ali"]
 tech_values = [1541,1479,1395,1236,1214,753]
 
-fig3 = px.pie(
-    names=tech_labels, values=tech_values,
-    title="Technician Contribution Share",
-    hole=0.4
-)
-st.plotly_chart(fig3, use_container_width=True)
+with c3:
+    fig3 = px.pie(
+        names=tech_labels,
+        values=tech_values,
+        title="Technician Contribution Share",
+        hole=0.4
+    )
+    fig3.update_traces(textposition="inside", textinfo="percent+label")
+    st.plotly_chart(fig3, use_container_width=True)
 
-# -----------------------------
-# TECHNICIAN WORKLOAD BAR
-# -----------------------------
+# Top Technician Workload Ranking
 tech_rank_labels = ["Dante","Sameer","Gilbert","Lito","Husam","Amgad","Ali"]
 tech_rank_values = [1541,1479,1395,1236,1214,1112,753]
 
-fig4 = px.bar(
-    x=tech_rank_values, y=tech_rank_labels,
-    orientation="h",
-    labels={"x":"Total Contribution", "y":"Technician"},
-    title="Top Technician Workload Ranking"
-)
-st.plotly_chart(fig4, use_container_width=True)
+with c4:
+    fig4 = px.bar(
+        x=tech_rank_values,
+        y=tech_rank_labels,
+        orientation="h",
+        labels={"x": "Total Contribution", "y": "Technician"},
+        title="Top Technician Workload Ranking"
+    )
+    fig4.update_traces(marker_color="#0077cc")
+    fig4.update_layout(yaxis=dict(autorange="reversed"))
+    st.plotly_chart(fig4, use_container_width=True)
+
+st.markdown("---")
 
 # -----------------------------
-# TECHNICIAN MONTHLY TABLE
+# TECHNICIAN FULL TABLE
 # -----------------------------
+st.subheader("👷 Full Technician Monthly Breakdown Workload (Jan–Dec)")
+
 tech_table = {
     "Technician": ["Ali","Amgad","Dante","Sameer","Gilbert","Lito","Husam","Nashwan","Moneef","Yousef"],
     "Jan":[50,117,129,216,132,143,88,71,61,16],
@@ -99,53 +121,126 @@ tech_table = {
 }
 
 df_tech = pd.DataFrame(tech_table)
-st.subheader("👷 Technician Monthly Breakdown Workload (Jan–Dec)")
 st.dataframe(df_tech.style.highlight_max(axis=0), use_container_width=True)
+
+st.markdown("---")
 
 # -----------------------------
 # MONTH-WISE DOWNTIME TABLE
 # -----------------------------
+st.subheader("📅 Month-wise Breakdown Downtime Summary")
+
 month_dt = {
     "Month": months,
     "Total Downtime (HH:MM:SS)": [
         "285:51:00","241:58:00","312:16:00","222:32:00","304:34:00","260:13:00",
-        "446:58:00","277:00:00","260:12:00","327:08:00","270:41:00","257:24:00"
+        "446:58:00 (Highest)","277:00:00","260:12:00","327:08:00","270:41:00","257:24:00"
     ]
 }
-
 df_month_dt = pd.DataFrame(month_dt)
-st.subheader("📅 Month-wise Breakdown Downtime Summary")
 st.dataframe(df_month_dt.style.highlight_max(subset=["Total Downtime (HH:MM:SS)"]), use_container_width=True)
+
+st.markdown("---")
 
 # -----------------------------
 # MACHINE BREAKDOWN FREQUENCY
 # -----------------------------
-machine_freq = {
-    "Machine": ["Crates Area/Line","M1","M2","M3","M4","M5","M6","M7","M8","M9","M10","M12","M13","M14","M15","M16","M17","M18"],
-    "Count": [635,822,621,538,590,1,574,825,614,59,1,366,317,805,963,214,511,447]
-}
-
-df_machine_freq = pd.DataFrame(machine_freq)
 st.subheader("⚙️ Machine-wise Breakdown Frequency Report")
-st.dataframe(df_machine_freq.style.highlight_max(subset=["Count"]), use_container_width=True)
+
+machine_freq = {
+    "Machine": [
+        "Crates Area/Line","M1","M2","M3","M4","M5","M6","M7","M8","M9",
+        "M10","M12","M13","M14","M15","M16","M17","M18"
+    ],
+    "Total Breakdown Count": [
+        635,822,621,538,590,1,574,825,614,59,
+        1,366,317,805,963,214,511,447
+    ]
+}
+df_machine_freq = pd.DataFrame(machine_freq)
+st.dataframe(df_machine_freq.style.highlight_max(subset=["Total Breakdown Count"]), use_container_width=True)
+
+st.markdown("---")
 
 # -----------------------------
-# MACHINE AREA REPEATED ISSUE TABLE
+# MACHINE AREA WISE REPEATED ISSUE
 # -----------------------------
+st.subheader("🏭 Machine Area Wise Repeated Issue")
+
 area_data = {
-    "Machine": ["M1","M1","M1","M2","M2","M2","M3","M3","M3","M3","M4","M4","M4","M4","M5","M6","M6","M6","M7","M7","M7","M8","M8","M8","M9","M9","M9","M10","M12","M12","M12","M13","M13","M13","M14","M14","M14","M15","M15","M15","M15","M16","M16","M16","M17","M17","M17","M18","M18","M18","Crates Area/Line","Crates Area/Line"],
-    "Area": ["Filling & Capping","Downline","Crates Area /Line","Filling & Capping","Downline","Upstream","Filling & Capping","Upstream","Downline","Crates Area /Line","Filling & Capping","Downline","Upstream","Crates Area /Line","Filling & Capping","Filling & Capping","Upstream","Downline","Filling & Capping","Upstream","Downline","Upstream","Downline","Filling & Capping","Upstream","Filling & Capping","Downline","Downline","Filling & Capping","Downline","Upstream","Upstream","Downline","Filling & Capping","Filling & Capping","Downline","Upstream","Downline","Crates Area /Line","Downline"],
-    "Count": [543,231,12,434,169,18,250,50,237,1,283,289,16,1,1,396,115,63,324,88,413,56,329,229,6,35,18,1,115,223,28,65,94,158,546,226,33,378,178,405,2,123,9,82,314,50,147,259,24,164,633,2]
+    "Machine": [
+        "M1","M1","M1",
+        "M2","M2","M2",
+        "M3","M3","M3","M3",
+        "M4","M4","M4","M4",
+        "M5",
+        "M6","M6","M6",
+        "M7","M7","M7",
+        "M8","M8","M8",
+        "M9","M9","M9",
+        "M10",
+        "M12","M12","M12",
+        "M13","M13","M13",
+        "M14","M14","M14",
+        "M15","M15","M15","M15",
+        "M16","M16","M16",
+        "M17","M17","M17",
+        "M18","M18","M18",
+        "Crates Area/Line","Crates Area/Line"
+    ],
+    "Area": [
+        "Filling & Capping","Downline","Crates Area /Line",
+        "Filling & Capping","Downline","Upstream",
+        "Filling & Capping","Upstream","Downline","Crates Area /Line",
+        "Filling & Capping","Downline","Upstream","Crates Area /Line",
+        "Filling & Capping",
+        "Filling & Capping","Upstream","Downline",
+        "Filling & Capping","Upstream","Downline",
+        "Upstream","Downline","Filling & Capping",
+        "Upstream","Filling & Capping","Downline",
+        "Downline",
+        "Filling & Capping","Downline","Upstream",
+        "Upstream","Downline","Filling & Capping",
+        "Filling & Capping","Downline","Upstream",
+        "Downline","Upstream","Filling & Capping","Crates Area /Line",
+        "Filling & Capping","Upstream","Downline",
+        "Filling & Capping","Upstream","Downline",
+        "Filling & Capping","Upstream","Downline",
+        "Crates Area /Line","Downline"
+    ],
+    "Count": [
+        543,231,12,
+        434,169,18,
+        250,50,237,1,
+        283,289,16,1,
+        1,
+        396,115,63,
+        324,88,413,
+        56,329,229,
+        6,35,18,
+        1,
+        115,223,28,
+        65,94,158,
+        546,226,33,
+        378,178,405,2,
+        123,9,82,
+        314,50,147,
+        259,24,164,
+        633,2
+    ]
 }
 
 df_area = pd.DataFrame(area_data)
-st.subheader("🏭 Machine Area Wise Repeated Issues")
 st.dataframe(df_area.style.highlight_max(subset=["Count"]), use_container_width=True)
 
+st.markdown("---")
+
 # -----------------------------
-# HOURLY BREAKDOWN HEATMAP
+# HOURLY BREAKDOWN HEATMAP + TRENDS
 # -----------------------------
-import numpy as np
+st.subheader("🔥 Hourly Breakdown Heatmap & Trends")
+
+months_short = months
 
 breakdown_matrix = np.array([
  [14.4,13.4,11.0,10.9,18.8,9.3,13.3,16.9,10.3,11.6,9.2,10.0],
@@ -174,36 +269,36 @@ breakdown_matrix = np.array([
  [9.3,10.4,19.1,16.7,15.0,9.8,20.6,9.8,18.0,9.5,6.0,10.0]
 ])
 
+# Heatmap
 fig_heat = px.imshow(
     breakdown_matrix,
-    labels=dict(x="Month", y="Hour", color="Hours"),
-    x=months,
+    labels=dict(x="Month", y="Hour", color="Breakdown Hours"),
+    x=months_short,
     aspect="auto",
     color_continuous_scale="Reds"
 )
-st.subheader("🔥 Hourly Breakdown Heatmap (Hour vs Month)")
 st.plotly_chart(fig_heat, use_container_width=True)
 
-# -----------------------------
-# MONTHLY TREND LINE
-# -----------------------------
+# Monthly Trend
 monthly_totals = breakdown_matrix.sum(axis=0)
-
 fig_trend = px.line(
-    x=months, y=monthly_totals,
-    labels={"x":"Month", "y":"Total Breakdown Hours"},
-    title="📈 Monthly Breakdown Trend"
+    x=months_short,
+    y=monthly_totals,
+    labels={"x": "Month", "y": "Total Breakdown Hours"},
+    title="📈 Monthly Breakdown Trend (Total per Month)"
 )
+fig_trend.update_traces(mode="lines+markers")
 st.plotly_chart(fig_trend, use_container_width=True)
 
-# -----------------------------
-# HOURLY TOTAL BAR
-# -----------------------------
+# Hourly Total
 hourly_totals = breakdown_matrix.sum(axis=1)
-
 fig_hour = px.bar(
-    x=list(range(24)), y=hourly_totals,
-    labels={"x":"Hour", "y":"Total Breakdown Hours"},
+    x=list(range(24)),
+    y=hourly_totals,
+    labels={"x": "Hour (0–23)", "y": "Total Breakdown Hours"},
     title="📊 Total Breakdown by Hour (0–23)"
 )
 st.plotly_chart(fig_hour, use_container_width=True)
+
+st.markdown("---")
+st.caption("NADEC Drinkable Plant | Technician Workload + Downtime Dashboard 2025")
