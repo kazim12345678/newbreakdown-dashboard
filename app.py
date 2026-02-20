@@ -35,8 +35,8 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.title("DRINKABLE SECTION – Advanced Technical Downtime Analysis")
-st.markdown("#### Drinkable Section KPIs for Mr. Omer")
+st.title("🏭 SERAC DRINKABLE SECTION – Advanced Technical Downtime Analysis")
+st.markdown("#### Mobile‑friendly, drill‑down, and KPI‑driven view")
 st.markdown("---")
 
 # ----------------------------------------------------
@@ -232,25 +232,56 @@ with c2:
     st.metric("Availability (%)", row["Availability %"])
 
 # ----------------------------------------------------
-# FIXED TREND‑STYLE VIEW (REAL MACHINE NAMES)
+# 🔥 UPGRADED TREND‑STYLE VIEW (COLOR, TOOLTIP, LABELS, SECTIONS)
 # ----------------------------------------------------
 st.markdown("---")
-st.subheader("📈 Trend‑style View by Machine")
+st.subheader("📈 Trend‑style View by Machine (Enhanced)")
+
+# Section grouping (you can rename later)
+section_map = {
+    "M1": "Section A", "M2": "Section A", "M3": "Section A", "M4": "Section A",
+    "M6": "Section B", "M7": "Section B", "M8": "Section B", "M9": "Section B",
+    "M12": "Section C", "M13": "Section C", "M14": "Section C",
+    "M15": "Section D", "M16": "Section D", "M17": "Section D", "M18": "Section D"
+}
 
 trend_df = machine_kpi.sort_values("Machine").reset_index(drop=True)
+trend_df["Section"] = trend_df["Machine"].map(section_map)
+
+colors = px.colors.sequential.YlOrRd
 
 fig_trend = go.Figure()
+
 fig_trend.add_trace(go.Scatter(
-    x=trend_df["Machine"],   # REAL MACHINE NAMES
+    x=trend_df["Machine"],
     y=trend_df["Total DT"],
-    mode="lines+markers",
-    name="Total DT (Minutes)"
+    mode="lines+markers+text",
+    text=[f"#{i+1}" for i in range(len(trend_df))],
+    textposition="top center",
+    marker=dict(
+        size=12,
+        color=trend_df["Total DT"],
+        colorscale=colors,
+        showscale=True,
+        colorbar=dict(title="DT (min)")
+    ),
+    line=dict(width=3, color="gray"),
+    hovertemplate=
+        "<b>Machine:</b> %{x}<br>" +
+        "<b>Total DT:</b> %{y} min<br>" +
+        "<b>Failures:</b> %{customdata[0]}<br>" +
+        "<b>MTBF:</b> %{customdata[1]} hr<br>" +
+        "<b>MTTR:</b> %{customdata[2]} hr<br>" +
+        "<b>Availability:</b> %{customdata[3]}%<br>" +
+        "<b>Section:</b> %{customdata[4]}<extra></extra>",
+    customdata=trend_df[["Failures", "MTBF (Hours)", "MTTR (Hours)", "Availability %", "Section"]]
 ))
 
 fig_trend.update_layout(
     xaxis_title="Machine",
     yaxis_title="Downtime (Minutes)",
-    height=420
+    height=450,
+    title="Enhanced Trend View (Color‑coded + Tooltips + Ranking + Sections)"
 )
 
 st.plotly_chart(fig_trend, use_container_width=True)
@@ -324,50 +355,4 @@ method = st.radio(
 if method == "Use current assumptions (events as failures)":
     if st.button("Show MTBF Table (Current Settings)"):
         st.dataframe(
-            machine_kpi[["Machine", "Failures", "MTBF (Hours)", "MTTR (Hours)", "Availability %"]],
-            use_container_width=True
-        )
-else:
-    op_hours_manual = st.number_input("Total Operating Hours (Manual)", min_value=1.0, value=600.0, step=1.0)
-    failures_manual = st.number_input("Total Failures (Manual)", min_value=1, value=10, step=1)
-    if st.button("Calculate Manual MTBF"):
-        mtbf_manual = op_hours_manual / failures_manual
-        st.success(f"MTBF = {mtbf_manual:.2f} Hours")
-
-# ----------------------------------------------------
-# PDF EXPORT
-# ----------------------------------------------------
-@st.cache_data
-def generate_pdf():
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=pagesizes.A4)
-    elements = []
-    styles = getSampleStyleSheet()
-
-    elements.append(Paragraph("SERAC Advanced Technical Downtime Report", styles["Heading1"]))
-    elements.append(Spacer(1, 0.3 * inch))
-    elements.append(Paragraph(f"Total Plant Downtime: {total_dt} Minutes", styles["Normal"]))
-    elements.append(Paragraph(f"Average per Machine: {int(avg_dt)} Minutes", styles["Normal"]))
-    elements.append(PageBreak())
-
-    table_data = [machine_kpi.columns.tolist()] + machine_kpi.values.tolist()
-    table = Table(table_data, repeatRows=1)
-    table.setStyle(TableStyle([
-        ('GRID', (0,0), (-1,-1), 0.3, colors.black),
-        ('BACKGROUND', (0,0), (-1,0), colors.grey),
-        ('FONTSIZE', (0,0), (-1,-1), 7)
-    ]))
-    elements.append(table)
-
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer
-
-pdf_file = generate_pdf()
-
-st.download_button(
-    "📥 Download Executive PDF Report",
-    data=pdf_file,
-    file_name="SERAC_Advanced_Report.pdf",
-    mime="application/pdf"
-)
+            machine_kpi[["Machine", "Failures", "MTBF (Hours)", "MTTR (
