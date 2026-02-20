@@ -349,3 +349,13 @@ if method == "Use current assumptions (events as failures)":
         )
 else:
     op_hours_manual = st
+    import streamlit as st
+
+st.set_page_config(page_title="NADEC Breakdown Dashboard", layout="wide")
+
+st.sidebar.title("Navigation")
+st.sidebar.page_link("app.py", label="Main Dashboard")
+st.sidebar.page_link("pages/1_Drinkable_KPIs_2025.py", label="Drinkable KPIs of 2025")
+
+st.title("NADEC Breakdown Dashboard")
+st.write("This is your main dashboard page. Use the sidebar to navigate to the 2025 KPIs dashboard.")
