@@ -28,7 +28,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("DRINKABLE SECTION – Advanced Technical Downtime Analysis")
-st.markdown("Drinkable Team KPIs Highlights from 1st Feb to 15 Feb 2026 for as per CUTE report")
+st.markdown("Drinkable Team KPIs Highlights from 1st Feb to 15 Feb 2026 as per CUTE report")
 st.markdown("---")
 
 # ----------------------------------------------------
