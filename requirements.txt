@@ -11,3 +11,9 @@ streamlit
 pandas
 plotly
 numpy
+kaleido
+reportlab
+pandas
+numpy
+plotly
+streamlit
