@@ -32,3 +32,10 @@ plotly
 kaleido==0.2.1
 openpyxl
 xlsxwriter
+streamlit
+pandas
+numpy
+plotly
+kaleido==0.2.1
+openpyxl
+xlsxwriter
