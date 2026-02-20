@@ -3,28 +3,21 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="SERAC Executive Dashboard V2", layout="wide")
-
-# --------- DARK THEME STYLE ----------
-st.markdown("""
-<style>
-body {background-color: #0e1117;}
-h1, h2, h3 {color: white;}
-</style>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title="SERAC Executive Dashboard", layout="wide")
 
 st.title("🏭 SERAC DRINKABLE SECTION")
-st.subheader("Technical Downtime Executive Dashboard - Version 2")
+st.subheader("Technical Downtime Executive Dashboard")
 
 # -----------------------------
-# RAW DATA
+# SAMPLE DATA (Replace with your full data list)
 # -----------------------------
 data = [
-# (DATA SHORTENED HERE FOR READABILITY — KEEP YOUR FULL DATA FROM PREVIOUS VERSION)
+    ("M1", "Electrical", 120),
+    ("M2", "Mechanical", 90),
+    ("M3", "Sensor Fault", 150),
+    ("M1", "Mechanical", 60),
+    ("M4", "Electrical", 200),
 ]
-
-# IMPORTANT:
-# Paste the FULL data list from Version 1 here (same as before)
 
 df = pd.DataFrame(data, columns=["Machine","Downtime Type","Minutes"])
 
@@ -39,16 +32,27 @@ machine_filter = st.sidebar.multiselect(
     default=sorted(df["Machine"].unique())
 )
 
+# Prevent empty selection crash
+if len(machine_filter) == 0:
+    st.warning("Please select at least one machine.")
+    st.stop()
+
 df_filtered = df[df["Machine"].isin(machine_filter)]
 
 # -----------------------------
-# KPI SECTION
+# KPI SECTION (SAFE)
 # -----------------------------
-total_dt = df_filtered["Minutes"].sum()
-avg_dt = round(df_filtered.groupby("Machine")["Minutes"].sum().mean(),1)
-top_machine = df_filtered.groupby("Machine")["Minutes"].sum().idxmax()
+if df_filtered.empty:
+    total_dt = 0
+    avg_dt = 0
+    top_machine = "No Data"
+else:
+    total_dt = df_filtered["Minutes"].sum()
+    avg_dt = round(df_filtered.groupby("Machine")["Minutes"].sum().mean(), 1)
+    machine_totals = df_filtered.groupby("Machine")["Minutes"].sum()
+    top_machine = machine_totals.idxmax() if not machine_totals.empty else "No Data"
 
-col1,col2,col3 = st.columns(3)
+col1, col2, col3 = st.columns(3)
 
 col1.metric("Total Downtime (Min)", total_dt)
 col2.metric("Avg Downtime / Machine", avg_dt)
@@ -63,76 +67,55 @@ st.subheader("🔴 Machine Downtime Ranking")
 
 machine_sum = df_filtered.groupby("Machine")["Minutes"].sum().sort_values(ascending=False)
 
-fig1 = px.bar(
-    x=machine_sum.index,
-    y=machine_sum.values,
-    color=machine_sum.values,
-    color_continuous_scale="Reds",
-    labels={'x':'Machine','y':'Minutes'}
-)
-
-st.plotly_chart(fig1, use_container_width=True)
+if not machine_sum.empty:
+    fig1 = px.bar(
+        x=machine_sum.index,
+        y=machine_sum.values,
+        color=machine_sum.values,
+        color_continuous_scale="Reds",
+        labels={'x':'Machine','y':'Minutes'}
+    )
+    st.plotly_chart(fig1, use_container_width=True)
+else:
+    st.info("No data available for selected machines.")
 
 # -----------------------------
-# PARETO ANALYSIS (80/20)
+# PARETO ANALYSIS
 # -----------------------------
-st.subheader("📊 Pareto Analysis - Top Downtime Causes")
+st.subheader("📊 Pareto Analysis")
 
 cause_sum = df_filtered.groupby("Downtime Type")["Minutes"].sum().sort_values(ascending=False)
 
-pareto_df = cause_sum.reset_index()
-pareto_df["Cumulative %"] = pareto_df["Minutes"].cumsum() / pareto_df["Minutes"].sum() * 100
+if not cause_sum.empty:
+    pareto_df = cause_sum.reset_index()
+    pareto_df["Cumulative %"] = pareto_df["Minutes"].cumsum() / pareto_df["Minutes"].sum() * 100
 
-fig2 = go.Figure()
+    fig2 = go.Figure()
 
-fig2.add_trace(go.Bar(
-    x=pareto_df["Downtime Type"],
-    y=pareto_df["Minutes"],
-    name="Downtime Minutes"
-))
+    fig2.add_trace(go.Bar(
+        x=pareto_df["Downtime Type"],
+        y=pareto_df["Minutes"],
+        name="Downtime Minutes"
+    ))
 
-fig2.add_trace(go.Scatter(
-    x=pareto_df["Downtime Type"],
-    y=pareto_df["Cumulative %"],
-    name="Cumulative %",
-    yaxis="y2"
-))
+    fig2.add_trace(go.Scatter(
+        x=pareto_df["Downtime Type"],
+        y=pareto_df["Cumulative %"],
+        name="Cumulative %",
+        yaxis="y2"
+    ))
 
-fig2.update_layout(
-    yaxis2=dict(
-        overlaying='y',
-        side='right',
-        title='Cumulative %'
+    fig2.update_layout(
+        yaxis2=dict(
+            overlaying='y',
+            side='right',
+            title='Cumulative %'
+        )
     )
-)
 
-st.plotly_chart(fig2, use_container_width=True)
-
-# -----------------------------
-# TOP 5 CRITICAL MACHINES
-# -----------------------------
-st.subheader("⚠ Top 5 Critical Machines")
-
-top5 = machine_sum.head(5)
-st.table(top5)
-
-# -----------------------------
-# TOP 10 CRITICAL CAUSES
-# -----------------------------
-st.subheader("🚨 Top 10 Downtime Causes")
-
-top10 = cause_sum.head(10)
-st.table(top10)
-
-# -----------------------------
-# OEM ACTION SECTION
-# -----------------------------
-st.subheader("📌 Recommended OEM Focus Areas")
-
-critical_causes = cause_sum.head(3).index.tolist()
-
-for cause in critical_causes:
-    st.write(f"• Immediate root cause analysis required for: **{cause}**")
+    st.plotly_chart(fig2, use_container_width=True)
+else:
+    st.info("No downtime causes available.")
 
 # -----------------------------
 # DOWNLOAD BUTTON
