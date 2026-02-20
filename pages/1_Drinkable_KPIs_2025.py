@@ -302,3 +302,138 @@ st.plotly_chart(fig_hour, use_container_width=True)
 
 st.markdown("---")
 st.caption("NADEC Drinkable Plant | Technician Workload + Downtime Dashboard 2025")
+import matplotlib.pyplot as plt
+from reportlab.lib.pagesizes import landscape, A4
+from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
+import tempfile
+import os
+
+# -----------------------------
+# FUNCTION: Convert DataFrame to Image
+# -----------------------------
+def df_to_image(df, filename):
+    fig, ax = plt.subplots(figsize=(12, 4))
+    ax.axis('tight')
+    ax.axis('off')
+    table = ax.table(cellText=df.values, colLabels=df.columns, loc='center')
+    table.auto_set_font_size(False)
+    table.set_fontsize(8)
+    table.scale(1, 1.5)
+    plt.savefig(filename, bbox_inches='tight')
+    plt.close()
+
+# -----------------------------
+# FUNCTION: Export Plotly Figure to PNG
+# -----------------------------
+def fig_to_png(fig, filename):
+    fig.write_image(filename)
+
+# -----------------------------
+# FUNCTION: Generate PDF
+# -----------------------------
+def generate_pdf():
+
+    temp_dir = tempfile.mkdtemp()
+    pdf_path = os.path.join(temp_dir, "NADEC_2025_Report.pdf")
+
+    c = canvas.Canvas(pdf_path, pagesize=landscape(A4))
+
+    # -----------------------------
+    # PAGE 1 — LOGO + TITLE + KPIs
+    # -----------------------------
+    c.drawImage("company_logo.png", 50, 450, width=400, height=120)
+    c.setFont("Helvetica-Bold", 28)
+    c.drawString(50, 420, "NADEC Drinkable Maintenance Performance Report – 2025")
+
+    c.setFont("Helvetica", 16)
+    y = 380
+    for k, v in kpi_data.items():
+        c.drawString(50, y, f"{k}: {v}")
+        y -= 25
+
+    c.showPage()
+
+    # -----------------------------
+    # PAGE 2 — CHARTS
+    # -----------------------------
+    charts = [
+        ("monthly_downtime.png", fig1),
+        ("top_machines.png", fig2),
+        ("tech_pie.png", fig3),
+        ("tech_rank.png", fig4)
+    ]
+
+    for filename, fig in charts:
+        path = os.path.join(temp_dir, filename)
+        fig_to_png(fig, path)
+        c.drawImage(path, 50, 100, width=700, height=400)
+        c.showPage()
+
+    # -----------------------------
+    # PAGE 3 — Technician Table
+    # -----------------------------
+    tech_img = os.path.join(temp_dir, "tech_table.png")
+    df_to_image(df_tech, tech_img)
+    c.drawImage(tech_img, 50, 80, width=700, height=450)
+    c.showPage()
+
+    # -----------------------------
+    # PAGE 4 — Machine Breakdown Frequency
+    # -----------------------------
+    freq_img = os.path.join(temp_dir, "machine_freq.png")
+    df_to_image(df_machine_freq, freq_img)
+    c.drawImage(freq_img, 50, 80, width=700, height=450)
+    c.showPage()
+
+    # -----------------------------
+    # PAGE 5 — Machine Area Repeated Issues
+    # -----------------------------
+    area_img = os.path.join(temp_dir, "area_table.png")
+    df_to_image(df_area, area_img)
+    c.drawImage(area_img, 50, 80, width=700, height=450)
+    c.showPage()
+
+    # -----------------------------
+    # PAGE 6 — Heatmap
+    # -----------------------------
+    heatmap_img = os.path.join(temp_dir, "heatmap.png")
+    fig_heat.write_image(heatmap_img)
+    c.drawImage(heatmap_img, 50, 80, width=700, height=450)
+    c.showPage()
+
+    # -----------------------------
+    # PAGE 7 — Monthly Trend
+    # -----------------------------
+    trend_img = os.path.join(temp_dir, "trend.png")
+    fig_trend.write_image(trend_img)
+    c.drawImage(trend_img, 50, 80, width=700, height=450)
+    c.showPage()
+
+    # -----------------------------
+    # PAGE 8 — Hourly Breakdown
+    # -----------------------------
+    hour_img = os.path.join(temp_dir, "hourly.png")
+    fig_hour.write_image(hour_img)
+    c.drawImage(hour_img, 50, 80, width=700, height=450)
+    c.showPage()
+
+    c.save()
+    return pdf_path
+
+# -----------------------------
+# DOWNLOAD BUTTONS (TOP + BOTTOM)
+# -----------------------------
+st.markdown("### 📄 Download Full Technical PDF Report")
+
+if st.button("Download PDF (Top)"):
+    pdf_file = generate_pdf()
+    with open(pdf_file, "rb") as f:
+        st.download_button("Click to Download PDF", f, file_name="NADEC_2025_Report.pdf")
+
+st.markdown("---")
+
+if st.button("Download PDF (Bottom)"):
+    pdf_file = generate_pdf()
+    with open(pdf_file, "rb") as f:
+        st.download_button("Click to Download PDF", f, file_name="NADEC_2025_Report.pdf")
