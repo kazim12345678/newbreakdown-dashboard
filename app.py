@@ -27,8 +27,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🏭 SERAC DRINKABLE SECTION – Advanced Technical Downtime Analysis")
-st.markdown("#### Mobile‑friendly, drill‑down, and KPI‑driven view")
+st.title("DRINKABLE SECTION – Advanced Technical Downtime Analysis")
+st.markdown("Drinkable Team KPIs Highlights for Mr. Omer")
 st.markdown("---")
 
 # ----------------------------------------------------
