@@ -127,7 +127,7 @@ machine_kpi = machine_analysis.merge(failure_counts, on="Machine", how="left")
 # ----------------------------------------------------
 # OPERATION TIME INPUT
 # ----------------------------------------------------
-st.subheader("⚙️ Operation Time & Reliability Basis")
+st.subheader("Operation Time & Reliability Basis")
 
 col_op1, col_op2 = st.columns(2)
 with col_op1:
@@ -154,7 +154,7 @@ machine_kpi["Availability %"] = (
 # KPI TILES
 # ----------------------------------------------------
 st.markdown("---")
-st.subheader("📌 Plant‑Level KPIs")
+st.subheader("Plant‑Level KPIs")
 
 plant_failures = failure_counts.sum()
 plant_dt_hours = (total_dt / 60)
@@ -173,7 +173,7 @@ k4.metric("Availability (%)", f"{plant_avail:.1f}")
 # MACHINE CRITICALITY
 # ----------------------------------------------------
 st.markdown("---")
-st.subheader("📊 Machine Criticality & Ranking")
+st.subheader("Machine Criticality & Ranking")
 
 fig_rank = px.bar(
     machine_kpi,
@@ -194,7 +194,7 @@ with st.expander("View Detailed Machine Table"):
 # MACHINE‑WISE DRILL‑DOWN
 # ----------------------------------------------------
 st.markdown("---")
-st.subheader("🔍 Machine‑wise Drill‑down")
+st.subheader("Machine‑wise Drill‑down")
 
 selected_machine = st.selectbox("Select Machine", sorted(df["Machine"].unique()))
 
@@ -227,7 +227,7 @@ with c2:
 # ENHANCED TREND‑STYLE VIEW
 # ----------------------------------------------------
 st.markdown("---")
-st.subheader("📈 Trend‑style View by Machine (Enhanced)")
+st.subheader("Trend‑style View by Machine (Enhanced)")
 
 section_map = {
     "M1": "Section A", "M2": "Section A", "M3": "Section A", "M4": "Section A",
@@ -302,7 +302,7 @@ st.plotly_chart(fig_heat, use_container_width=True)
 # TRUE PARETO
 # ----------------------------------------------------
 st.markdown("---")
-st.subheader("📉 True Pareto Analysis – Top 10 Downtime Causes")
+st.subheader("True Pareto Analysis – Top 10 Downtime Causes")
 
 pareto = cause_totals.reset_index()
 pareto["Cumulative %"] = pareto["Minutes"].cumsum() / total_dt * 100
@@ -331,7 +331,7 @@ st.plotly_chart(fig_pareto, use_container_width=True)
 # MTBF QUICK CALCULATOR
 # ----------------------------------------------------
 st.markdown("---")
-st.subheader("🧮 MTBF Quick Calculator")
+st.subheader("MTBF Quick Calculator")
 
 method = st.radio(
     "Select MTBF Calculation Method",
@@ -357,5 +357,5 @@ st.sidebar.title("Navigation")
 st.sidebar.page_link("app.py", label="Main Dashboard")
 st.sidebar.page_link("pages/1_Drinkable_KPIs_2025.py", label="Drinkable KPIs of 2025")
 
-st.title("NADEC Breakdown Dashboard")
-st.write("This is your main dashboard page. Use the sidebar to navigate to the 2025 KPIs dashboard.")
+st.title("Drinkable Breakdown Dashboard")
+st.write("This is Drinkable main dashboard page. Use the sidebar up right corner to navigate to the 2025 KPIs dashboard.")
