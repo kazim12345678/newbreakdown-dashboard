@@ -17,7 +17,6 @@ st.set_page_config(page_title="SERAC DT Analysis", layout="wide")
 st.markdown(
     """
     <style>
-    /* Make it a bit cleaner on mobile */
     .block-container {
         padding-top: 1rem;
         padding-bottom: 2rem;
@@ -130,12 +129,11 @@ machine_analysis.columns = ["Machine","Total DT"]
 machine_analysis["% Plant Impact"] = (machine_analysis["Total DT"]/total_dt*100).round(2)
 machine_analysis["Above Average"] = machine_analysis["Total DT"] > avg_dt
 
-# Failures = number of downtime events per machine
 failure_counts = df.groupby("Machine")["Downtime Type"].count().rename("Failures")
 machine_kpi = machine_analysis.merge(failure_counts, on="Machine", how="left")
 
 # ----------------------------------------------------
-# OPERATION TIME INPUT (for MTBF, MTTR, Availability)
+# OPERATION TIME INPUT
 # ----------------------------------------------------
 st.subheader("⚙️ Operation Time & Reliability Basis")
 
@@ -153,7 +151,6 @@ with col_op2:
     st.write("- MTTR uses downtime minutes / failures")
     st.write("- Availability uses operating hours vs downtime")
 
-# Compute KPIs per machine
 machine_kpi["DT Hours"] = (machine_kpi["Total DT"] / 60).round(2)
 machine_kpi["MTBF (Hours)"] = (op_hours_per_machine / machine_kpi["Failures"]).round(2)
 machine_kpi["MTTR (Hours)"] = (machine_kpi["DT Hours"] / machine_kpi["Failures"]).round(2)
@@ -162,7 +159,7 @@ machine_kpi["Availability %"] = (
 ).round(2)
 
 # ----------------------------------------------------
-# KPI TILES (PLANT LEVEL)
+# KPI TILES
 # ----------------------------------------------------
 st.markdown("---")
 st.subheader("📌 Plant‑Level KPIs")
@@ -181,12 +178,11 @@ k3.metric("Plant MTTR (Hours)", f"{plant_mttr:.2f}")
 k4.metric("Availability (%)", f"{plant_avail:.1f}")
 
 # ----------------------------------------------------
-# MACHINE CRITICALITY & AUTO COLOR
+# MACHINE CRITICALITY
 # ----------------------------------------------------
 st.markdown("---")
 st.subheader("📊 Machine Criticality & Ranking")
 
-# Auto color: high DT = red, low = green
 fig_rank = px.bar(
     machine_kpi,
     x="Machine",
@@ -236,30 +232,31 @@ with c2:
     st.metric("Availability (%)", row["Availability %"])
 
 # ----------------------------------------------------
-# TREND‑STYLE VIEW (SIMULATED ORDER)
+# FIXED TREND‑STYLE VIEW (REAL MACHINE NAMES)
 # ----------------------------------------------------
 st.markdown("---")
-st.subheader("📈 Trend‑style View by Machine Order")
+st.subheader("📈 Trend‑style View by Machine")
 
 trend_df = machine_kpi.sort_values("Machine").reset_index(drop=True)
-trend_df["Index"] = trend_df.index + 1
 
 fig_trend = go.Figure()
 fig_trend.add_trace(go.Scatter(
-    x=trend_df["Index"],
+    x=trend_df["Machine"],   # REAL MACHINE NAMES
     y=trend_df["Total DT"],
     mode="lines+markers",
     name="Total DT (Minutes)"
 ))
+
 fig_trend.update_layout(
-    xaxis_title="Machine Sequence",
+    xaxis_title="Machine",
     yaxis_title="Downtime (Minutes)",
     height=420
 )
+
 st.plotly_chart(fig_trend, use_container_width=True)
 
 # ----------------------------------------------------
-# HEATMAP – MACHINE vs DOWNTIME TYPE
+# HEATMAP
 # ----------------------------------------------------
 st.markdown("---")
 st.subheader("🔥 Heatmap – Machine vs Downtime Type")
@@ -282,7 +279,7 @@ fig_heat.update_layout(height=500)
 st.plotly_chart(fig_heat, use_container_width=True)
 
 # ----------------------------------------------------
-# TRUE PARETO (TOP 10 CAUSES)
+# TRUE PARETO
 # ----------------------------------------------------
 st.markdown("---")
 st.subheader("📉 True Pareto Analysis – Top 10 Downtime Causes")
@@ -311,7 +308,7 @@ fig_pareto.update_layout(
 st.plotly_chart(fig_pareto, use_container_width=True)
 
 # ----------------------------------------------------
-# MTBF QUICK CALCULATOR (BUTTON‑BASED)
+# MTBF QUICK CALCULATOR
 # ----------------------------------------------------
 st.markdown("---")
 st.subheader("🧮 MTBF Quick Calculator")
