@@ -10,30 +10,22 @@ from reportlab.lib.units import inch
 import io
 
 # ----------------------------------------------------
-# PAGE CONFIG & LIGHT THEME TWEAK
+# PAGE CONFIG
 # ----------------------------------------------------
 st.set_page_config(page_title="SERAC DT Analysis", layout="wide")
 
-st.markdown(
-    """
-    <style>
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 2rem;
-        padding-left: 0.8rem;
-        padding-right: 0.8rem;
-    }
-    .metric-label {
-        font-size: 0.8rem !important;
-    }
-    .metric-value {
-        font-size: 1.2rem !important;
-        font-weight: 700 !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 1rem;
+    padding-bottom: 2rem;
+    padding-left: 0.8rem;
+    padding-right: 0.8rem;
+}
+.metric-label { font-size: 0.8rem !important; }
+.metric-value { font-size: 1.2rem !important; font-weight: 700 !important; }
+</style>
+""", unsafe_allow_html=True)
 
 st.title("🏭 SERAC DRINKABLE SECTION – Advanced Technical Downtime Analysis")
 st.markdown("#### Mobile‑friendly, drill‑down, and KPI‑driven view")
@@ -152,8 +144,8 @@ with col_op2:
     st.write("- Availability uses operating hours vs downtime")
 
 machine_kpi["DT Hours"] = (machine_kpi["Total DT"] / 60).round(2)
-machine_kpi["MTBF (Hours"] = (op_hours_per_machine / machine_kpi["Failures"]).round(2)
-machine_kpi["MTTR (Hours"] = (machine_kpi["DT Hours"] / machine_kpi["Failures"]).round(2)
+machine_kpi["MTBF (Hours)"] = (op_hours_per_machine / machine_kpi["Failures"]).round(2)
+machine_kpi["MTTR (Hours)"] = (machine_kpi["DT Hours"] / machine_kpi["Failures"]).round(2)
 machine_kpi["Availability %"] = (
     (op_hours_per_machine - machine_kpi["DT Hours"]) / op_hours_per_machine * 100
 ).round(2)
@@ -227,12 +219,12 @@ with c2:
     row = machine_kpi[machine_kpi["Machine"] == selected_machine].iloc[0]
     st.metric("Total DT (Minutes)", int(row["Total DT"]))
     st.metric("Failures (Events)", int(row["Failures"]))
-    st.metric("MTBF (Hours", row["MTBF (Hours"])
-    st.metric("MTTR (Hours", row["MTTR (Hours"])
+    st.metric("MTBF (Hours)", row["MTBF (Hours)"])
+    st.metric("MTTR (Hours)", row["MTTR (Hours)"])
     st.metric("Availability (%)", row["Availability %"])
 
 # ----------------------------------------------------
-# UPGRADED TREND‑STYLE VIEW (COLOR, TOOLTIP, LABELS, SECTIONS)
+# ENHANCED TREND‑STYLE VIEW
 # ----------------------------------------------------
 st.markdown("---")
 st.subheader("📈 Trend‑style View by Machine (Enhanced)")
@@ -247,8 +239,6 @@ section_map = {
 trend_df = machine_kpi.sort_values("Machine").reset_index(drop=True)
 trend_df["Section"] = trend_df["Machine"].map(section_map)
 
-colors = px.colors.sequential.YlOrRd
-
 fig_trend = go.Figure()
 
 fig_trend.add_trace(go.Scatter(
@@ -260,7 +250,7 @@ fig_trend.add_trace(go.Scatter(
     marker=dict(
         size=12,
         color=trend_df["Total DT"],
-        colorscale=colors,
+        colorscale="YlOrRd",
         showscale=True,
         colorbar=dict(title="DT (min)")
     ),
@@ -273,7 +263,7 @@ fig_trend.add_trace(go.Scatter(
         "<b>MTTR:</b> %{customdata[2]} hr<br>" +
         "<b>Availability:</b> %{customdata[3]}%<br>" +
         "<b>Section:</b> %{customdata[4]}<extra></extra>",
-    customdata=trend_df[["Failures", "MTBF (Hours"], "MTTR (Hours"], "Availability %", "Section"]]
+    customdata=trend_df[["Failures", "MTBF (Hours)", "MTTR (Hours)", "Availability %", "Section"]]
 ))
 
 fig_trend.update_layout(
@@ -354,50 +344,8 @@ method = st.radio(
 if method == "Use current assumptions (events as failures)":
     if st.button("Show MTBF Table (Current Settings)"):
         st.dataframe(
-            machine_kpi[["Machine", "Failures", "MTBF (Hours"], "MTTR (Hours"], "Availability %"]],
+            machine_kpi[["Machine", "Failures", "MTBF (Hours)", "MTTR (Hours)", "Availability %"]],
             use_container_width=True
         )
 else:
-    op_hours_manual = st.number_input("Total Operating Hours (Manual)", min_value=1.0, value=600.0, step=1.0)
-    failures_manual = st.number_input("Total Failures (Manual)", min_value=1, value=10, step=1)
-    if st.button("Calculate Manual MTBF"):
-        mtbf_manual = op_hours_manual / failures_manual
-        st.success(f"MTBF = {mtbf_manual:.2f} Hours")
-
-# ----------------------------------------------------
-# PDF EXPORT
-# ----------------------------------------------------
-@st.cache_data
-def generate_pdf():
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=pagesizes.A4)
-    elements = []
-    styles = getSampleStyleSheet()
-
-    elements.append(Paragraph("SERAC Advanced Technical Downtime Report", styles["Heading1"]))
-    elements.append(Spacer(1, 0.3 * inch))
-    elements.append(Paragraph(f"Total Plant Downtime: {total_dt} Minutes", styles["Normal"]))
-    elements.append(Paragraph(f"Average per Machine: {int(avg_dt)} Minutes", styles["Normal"]))
-    elements.append(PageBreak())
-
-    table_data = [machine_kpi.columns.tolist()] + machine_kpi.values.tolist()
-    table = Table(table_data, repeatRows=1)
-    table.setStyle(TableStyle([
-        ('GRID', (0,0), (-1,-1), 0.3, colors.black),
-        ('BACKGROUND', (0,0), (-1,0), colors.grey),
-        ('FONTSIZE', (0,0), (-1,-1), 7)
-    ]))
-    elements.append(table)
-
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer
-
-pdf_file = generate_pdf()
-
-st.download_button(
-    "📥 Download Executive PDF Report",
-    data=pdf_file,
-    file_name="SERAC_Advanced_Report.pdf",
-    mime="application/pdf"
-)
+    op_hours_manual = st
