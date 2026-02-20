@@ -4,33 +4,61 @@ import plotly.express as px
 from io import BytesIO
 import os
 
+# ----------------- PAGE CONFIG -----------------
+
 st.set_page_config(page_title="Maintenance Daily Report Dashboard", layout="wide")
 
 st.title("Maintenance Daily Report Dashboard")
 st.write("Upload or edit the daily maintenance data. The latest saved data will be reused automatically.")
 
+# Saved data path (for now inside pages/)
 DATA_PATH = os.path.join(os.path.dirname(__file__), "maintenance_data.xlsx")
 
-# ---------- Helper functions ----------
+
+# ----------------- HELPER FUNCTIONS -----------------
+
+def parse_time_column(series: pd.Series) -> pd.Series:
+    """
+    Parse time-only strings like '6:40', '14:10' into datetime (time part used).
+    """
+    return pd.to_datetime(series.astype(str), format="%H:%M", errors="coerce")
+
 
 def clean_time_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Clean time-related columns and compute durations and hour.
+    Columns expected:
+    - Requested Time
+    - Start
+    - End
+    - Time Consumed
+    """
+    # Strip column names
     df.columns = [c.strip() for c in df.columns]
 
-    for col in ["Requested Time", "Start", "End"]:
-        if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors="coerce")
+    # Parse time-only columns
+    if "Requested Time" in df.columns:
+        df["Requested Time"] = parse_time_column(df["Requested Time"])
+    if "Start" in df.columns:
+        df["Start"] = parse_time_column(df["Start"])
+    if "End" in df.columns:
+        df["End"] = parse_time_column(df["End"])
 
+    # Time Consumed as timedelta
     if "Time Consumed" in df.columns:
         df["Time Consumed"] = pd.to_timedelta(df["Time Consumed"], errors="coerce")
     else:
         df["Time Consumed"] = pd.NaT
 
+    # Calculate Time Consumed if missing and Start/End exist
     if {"Start", "End"}.issubset(df.columns):
         mask = df["Time Consumed"].isna() & df["Start"].notna() & df["End"].notna()
         df.loc[mask, "Time Consumed"] = df.loc[mask, "End"] - df.loc[mask, "Start"]
 
+    # Minutes
     df["Minutes"] = df["Time Consumed"].dt.total_seconds() / 60
 
+    # Hour from Requested Time (fallback to Start)
     df["Hour"] = pd.NA
     if "Requested Time" in df.columns:
         df["Hour"] = df["Requested Time"].dt.hour
@@ -41,11 +69,14 @@ def clean_time_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def explode_technicians(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Split 'Performed By' into multiple rows so each technician gets full credit.
+    """
     if "Performed By" not in df.columns:
         df["Performed By"] = ""
 
     df["Performed By"] = df["Performed By"].fillna("")
-    df["Tech_List"] = df["Performed By"].astype(str).str.split("/")
+    df["Tech_List"] = df["Performed By"].astype(str).split("/") if False else df["Performed By"].astype(str).str.split("/")
     df_exploded = df.explode("Tech_List")
     df_exploded["Tech_List"] = df_exploded["Tech_List"].astype(str).str.strip()
     df_exploded = df_exploded[df_exploded["Tech_List"] != ""]
@@ -53,6 +84,9 @@ def explode_technicians(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def download_excel(df: pd.DataFrame) -> bytes:
+    """
+    Return Excel bytes for download.
+    """
     output = BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         df.to_excel(writer, index=False, sheet_name="Data")
@@ -60,20 +94,29 @@ def download_excel(df: pd.DataFrame) -> bytes:
 
 
 def load_saved_data() -> pd.DataFrame | None:
+    """
+    Load saved Excel from DATA_PATH if exists.
+    """
     if os.path.exists(DATA_PATH):
         return pd.read_excel(DATA_PATH)
     return None
 
 
 def save_data(df: pd.DataFrame):
+    """
+    Save dataframe to Excel at DATA_PATH.
+    """
     df.to_excel(DATA_PATH, index=False)
 
 
-# ---------- Load base data (saved or uploaded) ----------
+# ----------------- LOAD BASE DATA (SAVED OR UPLOADED) -----------------
 
 saved_df = load_saved_data()
 
-uploaded_file = st.file_uploader("Upload daily maintenance Excel (to replace current data)", type=["xlsx", "xls"])
+uploaded_file = st.file_uploader(
+    "Upload daily maintenance Excel (to replace current data)",
+    type=["xlsx", "xls"]
+)
 
 if uploaded_file is not None:
     base_df = pd.read_excel(uploaded_file)
@@ -89,12 +132,13 @@ if saved_df is None:
 df = clean_time_columns(saved_df.copy())
 df_tech = explode_technicians(df.copy())
 
-# ---------- Session state for editable data ----------
+# ----------------- SESSION STATE FOR EDITABLE DATA -----------------
 
 if "editable_df" not in st.session_state:
     st.session_state["editable_df"] = df.copy()
 
-# ---------- Sidebar filters (based on cleaned df) ----------
+
+# ----------------- SIDEBAR FILTERS -----------------
 
 st.sidebar.header("Filters")
 
@@ -128,7 +172,8 @@ if machine_filter and "Machine No." in df_tech_view.columns:
 if shift_filter and "ARIA" in df_tech_view.columns:
     df_tech_view = df_tech_view[df_tech_view["ARIA"].astype(str).isin(shift_filter)]
 
-# ---------- Data entry / edit mode ----------
+
+# ----------------- DATA ENTRY / EDIT MODE -----------------
 
 st.markdown("---")
 col_btn1, col_btn2 = st.columns([1, 3])
@@ -138,6 +183,7 @@ with col_btn1:
 if edit_mode:
     st.subheader("Data Entry / Edit Mode")
 
+    # Add new record
     with st.expander("Add new record"):
         with st.form("add_record_form"):
             new_row = {}
@@ -151,6 +197,7 @@ if edit_mode:
                 )
                 st.success("Row added to editable data.")
 
+    # Edit / delete
     st.write("Edit or mark rows for deletion below:")
     editable = st.session_state["editable_df"].copy()
     editable["Delete"] = False
@@ -182,7 +229,9 @@ if edit_mode:
     st.info("After saving, you can turn off 'Add / Edit Data' to view dashboards.")
     st.markdown("---")
 
-# Dashboards always use the cleaned df (not the raw session editor)
+
+# ----------------- DASHBOARDS -----------------
+
 st.subheader("Dashboards")
 
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
@@ -200,7 +249,12 @@ with tab1:
     if "Machine No." in df_view.columns:
         freq = df_view["Machine No."].astype(str).value_counts().reset_index()
         freq.columns = ["Machine No.", "Jobs"]
-        fig_mach = px.bar(freq, x="Machine No.", y="Jobs", title="Jobs per Machine")
+        fig_mach = px.bar(
+            freq,
+            x="Machine No.",
+            y="Jobs",
+            title="Jobs per Machine",
+        )
         st.plotly_chart(fig_mach, use_container_width=True)
     else:
         st.warning("Column 'Machine No.' not found in data.")
@@ -223,9 +277,11 @@ with tab2:
 # ---------- Tab 3: Shift Analysis ----------
 with tab3:
     if "ARIA" in df_view.columns:
+        # Count of jobs per shift
         shift_jobs = df_view["ARIA"].value_counts().reset_index()
         shift_jobs.columns = ["Shift", "Jobs"]
 
+        # Minutes per shift
         if "Minutes" in df_view.columns:
             shift_minutes = df_view.groupby("ARIA")["Minutes"].sum().reset_index()
             shift_minutes.columns = ["Shift", "Total Minutes"]
@@ -287,39 +343,26 @@ with tab4:
     else:
         st.info("Column 'Type' (Mech/Elect) not found in data.")
 
-# ---------- Tab 5: Hourly Breakdown ----------
+# ---------- Tab 5: Hourly Breakdown (24 hours, jobs only) ----------
 with tab5:
-    if "Hour" in df_view.columns:
+    # Force full 24-hour axis (0–23)
+    all_hours = pd.DataFrame({"Hour": range(24)})
+
+    if "Hour" in df_view.columns and "Machine No." in df_view.columns:
         hour_jobs = df_view.groupby("Hour")["Machine No."].count().reset_index()
         hour_jobs.columns = ["Hour", "Jobs"]
+        # Merge with all_hours to ensure all 24 hours appear
+        hour_jobs = all_hours.merge(hour_jobs, on="Hour", how="left").fillna(0)
 
-        if "Minutes" in df_view.columns:
-            hour_minutes = df_view.groupby("Hour")["Minutes"].sum().reset_index()
-        else:
-            hour_minutes = pd.DataFrame(columns=["Hour", "Minutes"])
-
-        col_h1, col_h2 = st.columns(2)
-        with col_h1:
-            fig_hour_jobs = px.bar(
-                hour_jobs,
-                x="Hour",
-                y="Jobs",
-                title="Jobs by Hour of Day",
-            )
-            st.plotly_chart(fig_hour_jobs, use_container_width=True)
-        with col_h2:
-            if not hour_minutes.empty:
-                fig_hour_min = px.bar(
-                    hour_minutes,
-                    x="Hour",
-                    y="Minutes",
-                    title="Minutes by Hour of Day",
-                )
-                st.plotly_chart(fig_hour_min, use_container_width=True)
-            else:
-                st.info("No minutes data available for hourly analysis.")
+        fig_hour_jobs = px.bar(
+            hour_jobs,
+            x="Hour",
+            y="Jobs",
+            title="Jobs by Hour of Day (0–23)",
+        )
+        st.plotly_chart(fig_hour_jobs, use_container_width=True)
     else:
-        st.warning("Hour column not available. Check Requested Time / Start parsing.")
+        st.warning("Hour or Machine No. column not available. Check time parsing and column names.")
 
 # ---------- Tab 6: Area / Classification ----------
 with tab6:
