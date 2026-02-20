@@ -1,230 +1,150 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-from io import StringIO
+import matplotlib.pyplot as plt
 
-# =========================
-# BASIC CONFIG
-# =========================
-st.set_page_config(
-    page_title="KUTE: Kazim Utilization Team Efficiency",
-    layout="wide",
-)
+st.set_page_config(page_title="SERAC Downtime Dashboard", layout="wide")
 
-# =========================
-# CSS STYLING
-# =========================
-st.markdown(
-    """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-    html, body, [class*="css"]  {
-        font-family: 'Inter', sans-serif;
-    }
-    .kute-header {
-        background: #0f172a;
-        padding: 0.6rem 1rem;
-        border-radius: 0.5rem;
-        color: #e5e7eb;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-    .kute-header-left {
-        display: flex;
-        flex-direction: column;
-    }
-    .kute-title {
-        font-size: 1.1rem;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-    }
-    .kute-subtitle {
-        font-size: 0.75rem;
-        color: #9ca3af;
-    }
-    .kute-header-right {
-        display: flex;
-        gap: 1rem;
-        align-items: center;
-        font-size: 0.8rem;
-    }
-    .kute-clock {
-        font-weight: 600;
-        color: #e5e7eb;
-    }
-    .kute-timer {
-        font-weight: 600;
-        color: #facc15;
-    }
-    .ticker-container {
-        margin-top: 0.4rem;
-        background: #020617;
-        border-radius: 0.4rem;
-        padding: 0.25rem 0.6rem;
-        overflow: hidden;
-        border: 1px solid #1f2937;
-    }
-    .ticker-text {
-        display: inline-block;
-        white-space: nowrap;
-        animation: ticker 25s linear infinite;
-        font-size: 0.78rem;
-        color: #e5e7eb;
-    }
-    @keyframes ticker {
-        0% { transform: translateX(100%); }
-        100% { transform: translateX(-100%); }
-    }
-    .ticker-highlight {
-        color: #f97316;
-        font-weight: 600;
-    }
-    .ticker-metric {
-        color: #22c55e;
-        font-weight: 600;
-    }
-    .kute-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 0.6rem;
-        font-size: 0.78rem;
-    }
-    .kute-table thead {
-        background: #020617;
-        position: sticky;
-        top: 0;
-        z-index: 1;
-    }
-    .kute-table th {
-        padding: 0.4rem 0.35rem;
-        text-align: center;
-        color: #e5e7eb;
-        border-bottom: 1px solid #1f2937;
-        border-right: 1px solid #111827;
-        font-weight: 600;
-        white-space: nowrap;
-    }
-    .kute-table td {
-        padding: 0.35rem 0.35rem;
-        border-bottom: 1px solid #111827;
-        border-right: 1px solid #020617;
-        color: #e5e7eb;
-        text-align: center;
-    }
-    .kute-row {
-        background: #020617;
-    }
-    .kute-row:hover {
-        background: #111827;
-    }
-    .kute-identity {
-        text-align: left;
-    }
-    .kute-machine-name {
-        font-weight: 600;
-        color: #e5e7eb;
-    }
-    .kute-machine-code {
-        font-size: 0.7rem;
-        color: #9ca3af;
-    }
-    .kute-shift {
-        font-size: 0.7rem;
-        color: #38bdf8;
-    }
-    .kute-segment-bar {
-        display: flex;
-        width: 100%;
-        height: 12px;
-        border-radius: 999px;
-        overflow: hidden;
-        background: #020617;
-        border: 1px solid #1f2937;
-    }
-    .seg-prod { background: #059669; }
-    .seg-bd { background: #e11d48; }
-    .seg-rep { background: #f97316; }
-    .seg-rem { background: #eab308; }
-    .kute-eff {
-        font-weight: 700;
-    }
-    .kute-complaints {
-        font-size: 0.7rem;
-    }
-    .kute-complaints-bar {
-        width: 100%;
-        height: 6px;
-        border-radius: 999px;
-        overflow: hidden;
-        background: #020617;
-        border: 1px solid #1f2937;
-        margin-top: 2px;
-    }
-    .kute-complaints-fill {
-        height: 100%;
-        background: #22c55e;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+st.title("🔧 SERAC Production Line Downtime Dashboard")
+st.markdown("### Technical Downtime Analysis (M1 - M9)")
 
-# =========================
-# MOCK DATA GENERATOR
-# =========================
-def generate_mock_data():
-    np.random.seed(42)
-    machines = [f"M{i:02d}" for i in range(1, 13)]
-    rows = []
-    now = datetime.now()
-    for m in machines:
-        code = f"KUTE-{int(m[1:]):02d}"
-        shift_start = now.replace(hour=6, minute=0, second=0, microsecond=0)
-        shift_end = now.replace(hour=18, minute=0, second=0, microsecond=0)
-        prod = np.random.randint(60, 85)
-        bd = np.random.randint(5, 20)
-        rep = np.random.randint(5, 15)
-        rem = max(0, 100 - (prod + bd + rep))
-        pe = np.random.uniform(80, 98)
-        oe = np.random.uniform(75, 95)
-        ou = np.random.uniform(70, 98)
-        pr_pcs = np.random.randint(18000, 42000)
-        ta_mins = 720
-        failures = np.random.randint(1, 6)
-        total_bd_mins = int(ta_mins * (bd / 100))
-        mttr = total_bd_mins / failures
-        mtbf = (ta_mins - total_bd_mins) / failures
-        solved = np.random.randint(3, 10)
-        total_comp = solved + np.random.randint(0, 5)
-        rows.append(
-            {
-                "Machine": m,
-                "Code": code,
-                "ShiftStart": shift_start.strftime("%H:%M"),
-                "ShiftEnd": shift_end.strftime("%H:%M"),
-                "ProdPct": prod,
-                "BdPct": bd,
-                "RepPct": rep,
-                "RemPct": rem,
-                "PE": round(pe, 1),
-                "OE": round(oe, 1),
-                "OU": round(ou, 1),
-                "PR_Pcs": pr_pcs,
-                "TA_Mins": ta_mins,
-                "MTTR": round(mttr, 1),
-                "MTBF": round(mtbf, 1),
-                "ComplSolved": solved,
-                "ComplTotal": total_comp,
-            }
-        )
-    return pd.DataFrame(rows)
+# -----------------------------
+# Raw Data
+# -----------------------------
 
-# =========================
-# SESSION & AUTO REFRESH
-# =========================
-def ensure_session_state():
-    if "df" not in st.session_state:
-        st.session_state.df = generate_mock_data()
-    if "last_refresh" not in st.session
+data = [
+    # M1
+    ["M1", "Crates delivery stopped-Tech", 316],
+    ["M1", "Filling product valve", 112],
+    ["M1", "Filling Station", 70],
+    ["M1", "Product Level Low", 34],
+    ["M1", "Packer", 30],
+    ["M1", "Bottle line conveyor", 21],
+    ["M1", "Filling Printer", 15],
+    ["M1", "Possimat", 15],
+    ["M1", "Crates area / conveyors", 12],
+    ["M1", "Crate Stacker", 4],
+
+    # M2
+    ["M2", "Crate Stacker", 374],
+    ["M2", "Crates delivery stopped-Tech", 239],
+    ["M2", "Filler", 169],
+    ["M2", "Filling product valve", 85],
+    ["M2", "Product Level Low", 73],
+    ["M2", "Packer", 52],
+    ["M2", "Cap Applicator", 50],
+    ["M2", "Bottle guider/Bottle holder/Bottle Screw", 44],
+    ["M2", "Conveyor Breakdown", 25],
+    ["M2", "Welding work", 23],
+    ["M2", "Possimat", 20],
+    ["M2", "Bottle line conveyor", 12],
+    ["M2", "Outfeed Conveyor", 10],
+
+    # M3
+    ["M3", "Crates delivery stopped-Tech", 485],
+    ["M3", "Filler", 482],
+    ["M3", "Product Level Low", 127],
+    ["M3", "Filling product valve", 126],
+    ["M3", "Crates area / conveyors", 90],
+    ["M3", "Welding work", 77],
+    ["M3", "Electrical Motor", 48],
+    ["M3", "Bottle guider/Bottle holder/Bottle Screw", 46],
+    ["M3", "Filling Station", 41],
+    ["M3", "Electrical Sensor", 36],
+    ["M3", "Conveyor Breakdown", 28],
+    ["M3", "Crate Stacker", 27],
+    ["M3", "Possimat", 12],
+    ["M3", "Packer", 11],
+
+    # M4
+    ["M4", "Crates delivery stopped-Tech", 329],
+    ["M4", "Crate Stacker", 220],
+    ["M4", "Product Level Low", 98],
+    ["M4", "Conveyor Between Packer & Cold Store", 82],
+    ["M4", "Crates area / conveyors", 81],
+    ["M4", "Divider", 74],
+    ["M4", "Filling product valve", 70],
+    ["M4", "Packer", 65],
+    ["M4", "Crate Conveyor & Pusher C-Loop", 25],
+    ["M4", "Automation Fault", 16],
+    ["M4", "Welding work", 12],
+    ["M4", "Labeling Machine", 5],
+
+    # M6
+    ["M6", "Conveyor Breakdown", 93],
+    ["M6", "Bottle line conveyor", 56],
+    ["M6", "Possimat", 50],
+    ["M6", "Axon Machine", 44],
+    ["M6", "Filling Nozzle issue", 42],
+    ["M6", "Product Level Low", 35],
+    ["M6", "Outfeed Conveyor", 30],
+    ["M6", "Filling Printer", 18],
+    ["M6", "May pack", 17],
+    ["M6", "Bottle guider/Bottle holder/Bottle Screw", 8],
+
+    # M7
+    ["M7", "Crates delivery stopped-Tech", 270],
+    ["M7", "Packer", 125],
+    ["M7", "Filling Printer", 104],
+    ["M7", "Welding work", 73],
+    ["M7", "Filling Station", 45],
+    ["M7", "Product Level Low", 25],
+    ["M7", "Automation Fault", 23],
+    ["M7", "Crate Stacker", 14],
+
+    # M8
+    ["M8", "Crates delivery stopped-Tech", 266],
+    ["M8", "Packer", 85],
+    ["M8", "Crate Conveyor & Pusher C-Loop", 28],
+    ["M8", "Product Level Low", 26],
+    ["M8", "Filling product valve", 18],
+    ["M8", "Filler", 18],
+]
+
+df = pd.DataFrame(data, columns=["Machine", "Downtime Type", "Minutes"])
+
+# -----------------------------
+# KPI Section
+# -----------------------------
+
+total_downtime = df["Minutes"].sum()
+total_machines = df["Machine"].nunique()
+top_machine = df.groupby("Machine")["Minutes"].sum().idxmax()
+
+col1, col2, col3 = st.columns(3)
+
+col1.metric("Total Downtime (Minutes)", total_downtime)
+col2.metric("Total Machines Reported", total_machines)
+col3.metric("Highest Downtime Machine", top_machine)
+
+st.markdown("---")
+
+# -----------------------------
+# Machine Wise Downtime
+# -----------------------------
+
+st.subheader("📊 Machine Wise Total Downtime")
+
+machine_summary = df.groupby("Machine")["Minutes"].sum().sort_values()
+
+fig1, ax1 = plt.subplots()
+machine_summary.plot(kind="barh", ax=ax1)
+st.pyplot(fig1)
+
+# -----------------------------
+# Top 10 Downtime Causes
+# -----------------------------
+
+st.subheader("🚨 Top 10 Downtime Causes")
+
+top_causes = df.groupby("Downtime Type")["Minutes"].sum().sort_values(ascending=False).head(10)
+
+fig2, ax2 = plt.subplots()
+top_causes.plot(kind="bar", ax=ax2)
+st.pyplot(fig2)
+
+# -----------------------------
+# Detailed Data View
+# -----------------------------
+
+st.subheader("📋 Full Downtime Data Table")
+st.dataframe(df)
