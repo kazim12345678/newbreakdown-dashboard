@@ -62,7 +62,7 @@ def explode_technicians(df):
     df["Performed By"] = df["Performed By"].fillna("")
     df["Tech_List"] = df["Performed By"].astype(str).str.split("/")
     df_exploded = df.explode("Tech_List")
-    df_exploded["Tech_List"] = df_exploded["Tech_List"].astype(str).strip()
+    df_exploded["Tech_List"] = df_exploded["Tech_List"].astype(str).str.strip()
     df_exploded = df_exploded[df_exploded["Tech_List"] != ""]
     return df_exploded
 
@@ -219,3 +219,15 @@ with tab6:
 # ---------- Tab 7 ----------
 with tab7:
     st.dataframe(df_view, use_container_width=True)
+    def explode_technicians(df):
+    """Split 'Performed By' into multiple rows."""
+    if "Performed By" not in df.columns:
+        df["Performed By"] = ""
+
+    df["Performed By"] = df["Performed By"].fillna("")
+    df["Tech_List"] = df["Performed By"].astype(str).str.split("/")
+
+    df_exploded = df.explode("Tech_List")
+    df_exploded["Tech_List"] = df_exploded["Tech_List"].astype(str).str.strip()
+    df_exploded = df_exploded[df_exploded["Tech_List"] != ""]
+    return df_exploded
