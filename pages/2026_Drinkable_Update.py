@@ -131,7 +131,7 @@ machine_list = sorted(safe_col(df, "Machine No.").dropna().astype(str).unique())
 shift_list = sorted(safe_col(df, "Shift").dropna().astype(str).unique())
 job_list = sorted(safe_col(df, "Job").dropna().astype(str).unique())
 area_list = sorted(safe_col(df, "Machine Classification").dropna().astype(str).unique())
-tech_list = sorted(df_tech["Tech_List"].dropna().astype(str).unique())
+tech_list = sorted(df_tech["Tech_List"].dropna().astype(str).unique()) if not df_tech.empty else []
 
 machine_filter = st.sidebar.multiselect("Machine", machine_list)
 shift_filter = st.sidebar.multiselect("Shift", shift_list)
@@ -141,13 +141,13 @@ tech_filter = st.sidebar.multiselect("Technician", tech_list)
 
 df_view = df.copy()
 
-if machine_filter:
+if machine_filter and "Machine No." in df_view.columns:
     df_view = df_view[df_view["Machine No."].astype(str).isin(machine_filter)]
-if shift_filter:
+if shift_filter and "Shift" in df_view.columns:
     df_view = df_view[df_view["Shift"].astype(str).isin(shift_filter)]
-if job_filter:
+if job_filter and "Job" in df_view.columns:
     df_view = df_view[df_view["Job"].astype(str).isin(job_filter)]
-if area_filter:
+if area_filter and "Machine Classification" in df_view.columns:
     df_view = df_view[df_view["Machine Classification"].astype(str).isin(area_filter)]
 
 df_tech_view = df_tech.copy()
@@ -176,7 +176,7 @@ with tabs[0]:
     else:
         freq = col.astype(str).value_counts().reset_index()
         freq.columns = ["Machine No.", "Jobs"]
-        st.plotly_chart(px.bar(freq, x="Machine No.", y="Jobs"), use_container_width=True)
+        st.plotly_chart(px.bar(freq, x="Machine No.", y="Jobs", title="Jobs per Machine"), use_container_width=True)
 
 # ---------- Technician Performance ----------
 with tabs[1]:
@@ -184,9 +184,12 @@ with tabs[1]:
         st.info("No technician data.")
     else:
         tech = df_tech_view.groupby("Tech_List")["Minutes"].sum().reset_index()
-        st.plotly_chart(px.bar(tech, x="Tech_List", y="Minutes"), use_container_width=True)
+        tech.columns = ["Technician", "Total Minutes"]
+        st.plotly_chart(px.bar(tech, x="Technician", y="Total Minutes", title="Technician Performance"), use_container_width=True)
 
         tech_date = df_tech_view.groupby(["Tech_List", "Date"])["Minutes"].sum().reset_index()
+        tech_date.columns = ["Technician", "Date", "Total Minutes"]
+        st.subheader("Technician Performance – Date-wise")
         st.dataframe(tech_date, use_container_width=True)
 
 # ---------- Job Type ----------
@@ -197,7 +200,7 @@ with tabs[2]:
     else:
         job_counts = col.value_counts().reset_index()
         job_counts.columns = ["Job", "Count"]
-        st.plotly_chart(px.bar(job_counts, x="Job", y="Count"), use_container_width=True)
+        st.plotly_chart(px.bar(job_counts, x="Job", y="Count", title="Jobs by Job Type"), use_container_width=True)
 
 # ---------- Spare Parts ----------
 with tabs[3]:
@@ -208,17 +211,19 @@ with tabs[3]:
     else:
         spare_counts = spare.value_counts().reset_index()
         spare_counts.columns = ["Spare Part", "Count"]
-        st.plotly_chart(px.bar(spare_counts, x="Spare Part", y="Count"), use_container_width=True)
-        st.dataframe(spare_counts)
+        st.plotly_chart(px.bar(spare_counts, x="Spare Part", y="Count", title="Spare Parts Usage"), use_container_width=True)
+        st.dataframe(spare_counts, use_container_width=True)
 
 # ---------- Notifications ----------
 with tabs[4]:
     notif = safe_col(df_view, "Notification No.")
-    if notif.empty:
-        st.info("No notifications.")
+    mach = safe_col(df_view, "Machine No.")
+    if notif.empty or mach.empty:
+        st.info("No notifications data.")
     else:
         notif_mach = df_view.groupby("Machine No.")["Notification No."].nunique().reset_index()
-        st.plotly_chart(px.bar(notif_mach, x="Machine No.", y="Notification No."), use_container_width=True)
+        notif_mach.columns = ["Machine No.", "Unique Notifications"]
+        st.plotly_chart(px.bar(notif_mach, x="Machine No.", y="Unique Notifications", title="Notifications per Machine"), use_container_width=True)
 
 # ---------- Remarks ----------
 with tabs[5]:
@@ -227,15 +232,22 @@ with tabs[5]:
     if remarks.empty:
         st.info("No remarks.")
     else:
-        remarks_mach = df_view[df_view["Remarks"].astype(str).str.strip() != ""]["Machine No."].value_counts().reset_index()
-        remarks_mach.columns = ["Machine No.", "Remarks Count"]
-        st.plotly_chart(px.bar(remarks_mach, x="Machine No.", y="Remarks Count"), use_container_width=True)
+        if "Machine No." in df_view.columns:
+            remarks_mach = df_view[df_view["Remarks"].astype(str).str.strip() != ""]["Machine No."].value_counts().reset_index()
+            remarks_mach.columns = ["Machine No.", "Remarks Count"]
+            st.plotly_chart(px.bar(remarks_mach, x="Machine No.", y="Remarks Count", title="Remarks per Machine"), use_container_width=True)
+            st.dataframe(remarks_mach, use_container_width=True)
+        else:
+            st.info("Machine No. column not available for remarks summary.")
 
 # ---------- Hourly Breakdown ----------
 with tabs[6]:
-    hour_jobs = df_view.groupby("Hour")["Machine No."].count().reset_index()
-    hour_jobs.columns = ["Hour", "Jobs"]
-    st.plotly_chart(px.bar(hour_jobs, x="Hour", y="Jobs"), use_container_width=True)
+    if "Hour" in df_view.columns and "Machine No." in df_view.columns:
+        hour_jobs = df_view.groupby("Hour")["Machine No."].count().reset_index()
+        hour_jobs.columns = ["Hour", "Jobs"]
+        st.plotly_chart(px.bar(hour_jobs, x="Hour", y="Jobs", title="Breakdowns by Hour"), use_container_width=True)
+    else:
+        st.info("Hour or Machine No. data not available for hourly breakdown.")
 
 # ---------- Raw Data ----------
 with tabs[7]:
