@@ -111,6 +111,7 @@ if saved_df is None:
 df = clean_time_columns(saved_df.copy())
 df_tech = explode_technicians(df.copy())
 
+
 # ----------------- SIDEBAR FILTERS -----------------
 
 st.sidebar.header("Filters")
@@ -128,21 +129,21 @@ area_filter = st.sidebar.multiselect("Machine Classification", area_list)
 tech_filter = st.sidebar.multiselect("Technician", tech_list)
 
 df_view = df.copy()
-if machine_filter and "Machine No." in df_view.columns:
+if machine_filter:
     df_view = df_view[df_view["Machine No."].astype(str).isin(machine_filter)]
-if shift_filter and "Shift" in df_view.columns:
+if shift_filter:
     df_view = df_view[df_view["Shift"].astype(str).isin(shift_filter)]
-if job_filter and "Job" in df_view.columns:
+if job_filter:
     df_view = df_view[df_view["Job"].astype(str).isin(job_filter)]
-if area_filter and "Machine Classification" in df_view.columns:
+if area_filter:
     df_view = df_view[df_view["Machine Classification"].astype(str).isin(area_filter)]
 
 df_tech_view = df_tech.copy()
 if tech_filter:
     df_tech_view = df_tech_view[df_tech_view["Tech_List"].astype(str).isin(tech_filter)]
-if machine_filter and "Machine No." in df_tech_view.columns:
+if machine_filter:
     df_tech_view = df_tech_view[df_tech_view["Machine No."].astype(str).isin(machine_filter)]
-if shift_filter and "Shift" in df_tech_view.columns:
+if shift_filter:
     df_tech_view = df_tech_view[df_tech_view["Shift"].astype(str).isin(shift_filter)]
 
 
@@ -160,158 +161,77 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "Raw Data",
 ])
 
-# ---------- Tab 1: Machine Breakdown Frequency ----------
+# ---------- Tab 1 ----------
 with tab1:
-    if "Machine No." in df_view.columns:
-        freq = df_view["Machine No."].astype(str).value_counts().reset_index()
-        freq.columns = ["Machine No.", "Jobs"]
-        fig_mach = px.bar(
-            freq,
-            x="Machine No.",
-            y="Jobs",
-            title="Jobs per Machine",
-        )
-        st.plotly_chart(fig_mach, use_container_width=True)
-    else:
-        st.warning("Column 'Machine No.' not found in data.")
+    freq = df_view["Machine No."].astype(str).value_counts().reset_index()
+    freq.columns = ["Machine No.", "Jobs"]
+    st.plotly_chart(px.bar(freq, x="Machine No.", y="Jobs", title="Jobs per Machine"), use_container_width=True)
 
-# ---------- Tab 2: Technician Performance ----------
+# ---------- Tab 2 ----------
 with tab2:
     if not df_tech_view.empty:
         tech = df_tech_view.groupby("Tech_List")["Minutes"].sum().reset_index()
         tech.columns = ["Technician", "Total Minutes"]
-        fig_tech = px.bar(
-            tech,
-            x="Technician",
-            y="Total Minutes",
-            title="Technician Performance (Minutes)",
+        st.plotly_chart(px.bar(tech, x="Technician", y="Total Minutes", title="Technician Performance"), use_container_width=True)
+
+        # ⭐ NEW: Technician Performance Table (Date-wise)
+        tech_date = (
+            df_tech_view.groupby(["Tech_List", "Date"])["Minutes"]
+            .sum()
+            .reset_index()
+            .sort_values(["Tech_List", "Date"])
         )
-        st.plotly_chart(fig_tech, use_container_width=True)
+        tech_date.columns = ["Technician", "Date", "Total Minutes"]
+
+        st.subheader("Technician Performance – Date-wise")
+        st.dataframe(tech_date, use_container_width=True)
+
     else:
         st.warning("No technician data available (Performed By column may be empty).")
 
-# ---------- Tab 3: Shift Analysis ----------
+# ---------- Tab 3 ----------
 with tab3:
-    if "Shift" in df_view.columns:
-        shift_jobs = df_view["Shift"].value_counts().reset_index()
-        shift_jobs.columns = ["Shift", "Jobs"]
+    shift_jobs = df_view["Shift"].value_counts().reset_index()
+    shift_jobs.columns = ["Shift", "Jobs"]
 
-        if "Minutes" in df_view.columns:
-            shift_minutes = df_view.groupby("Shift")["Minutes"].sum().reset_index()
-            shift_minutes.columns = ["Shift", "Total Minutes"]
-        else:
-            shift_minutes = pd.DataFrame(columns=["Shift", "Total Minutes"])
+    shift_minutes = df_view.groupby("Shift")["Minutes"].sum().reset_index()
+    shift_minutes.columns = ["Shift", "Total Minutes"]
 
-        col_s1, col_s2 = st.columns(2)
-        with col_s1:
-            fig_shift_jobs = px.bar(
-                shift_jobs,
-                x="Shift",
-                y="Jobs",
-                title="Jobs per Shift",
-            )
-            st.plotly_chart(fig_shift_jobs, use_container_width=True)
-        with col_s2:
-            if not shift_minutes.empty:
-                fig_shift_min = px.bar(
-                    shift_minutes,
-                    x="Shift",
-                    y="Total Minutes",
-                    title="Total Minutes per Shift",
-                )
-                st.plotly_chart(fig_shift_min, use_container_width=True)
-            else:
-                st.info("No minutes data available for shift analysis.")
-    else:
-        st.warning("Column 'Shift' not found in data.")
+    col1, col2 = st.columns(2)
+    col1.plotly_chart(px.bar(shift_jobs, x="Shift", y="Jobs", title="Jobs per Shift"), use_container_width=True)
+    col2.plotly_chart(px.bar(shift_minutes, x="Shift", y="Total Minutes", title="Minutes per Shift"), use_container_width=True)
 
-# ---------- Tab 4: Job Type Analysis ----------
+# ---------- Tab 4 ----------
 with tab4:
-    col_j1, col_j2 = st.columns(2)
+    col1, col2 = st.columns(2)
 
-    if "Job" in df_view.columns:
-        job_counts = df_view["Job"].value_counts().reset_index()
-        job_counts.columns = ["Job", "Jobs"]
-        with col_j1:
-            fig_job = px.bar(
-                job_counts,
-                x="Job",
-                y="Jobs",
-                title="Jobs by Job",
-            )
-            st.plotly_chart(fig_job, use_container_width=True)
-    else:
-        st.warning("Column 'Job' not found in data.")
+    job_counts = df_view["Job"].value_counts().reset_index()
+    job_counts.columns = ["Job", "Jobs"]
+    col1.plotly_chart(px.bar(job_counts, x="Job", y="Jobs", title="Jobs by Job"), use_container_width=True)
 
-    if "Type" in df_view.columns:
-        type_counts = df_view["Type"].value_counts().reset_index()
-        type_counts.columns = ["Type", "Jobs"]
-        with col_j2:
-            fig_type = px.bar(
-                type_counts,
-                x="Type",
-                y="Jobs",
-                title="Jobs by Type (Mech/Elect)",
-            )
-            st.plotly_chart(fig_type, use_container_width=True)
-    else:
-        st.info("Column 'Type' (Mech/Elect) not found in data.")
+    type_counts = df_view["Type"].value_counts().reset_index()
+    type_counts.columns = ["Type", "Jobs"]
+    col2.plotly_chart(px.bar(type_counts, x="Type", y="Jobs", title="Jobs by Type (Mech/Elect)"), use_container_width=True)
 
-# ---------- Tab 5: Hourly Breakdown ----------
+# ---------- Tab 5 ----------
 with tab5:
     all_hours = pd.DataFrame({"Hour": range(24)})
+    hour_jobs = df_view.groupby("Hour")["Machine No."].count().reset_index()
+    hour_jobs = all_hours.merge(hour_jobs, on="Hour", how="left").fillna(0)
+    st.plotly_chart(px.bar(hour_jobs, x="Hour", y="Jobs", title="Jobs by Hour (0–23)"), use_container_width=True)
 
-    if "Hour" in df_view.columns and "Machine No." in df_view.columns:
-        hour_jobs = df_view.groupby("Hour")["Machine No."].count().reset_index()
-        hour_jobs.columns = ["Hour", "Jobs"]
-        hour_jobs = all_hours.merge(hour_jobs, on="Hour", how="left").fillna(0)
-
-        fig_hour_jobs = px.bar(
-            hour_jobs,
-            x="Hour",
-            y="Jobs",
-            title="Jobs by Hour of Day (0–23)",
-        )
-        st.plotly_chart(fig_hour_jobs, use_container_width=True)
-    else:
-        st.warning("Hour or Machine No. column not available. Check time parsing and column names.")
-
-# ---------- Tab 6: Area / Classification ----------
+# ---------- Tab 6 ----------
 with tab6:
-    if "Machine Classification" in df_view.columns:
-        area_jobs = df_view["Machine Classification"].value_counts().reset_index()
-        area_jobs.columns = ["Area", "Jobs"]
+    area_jobs = df_view["Machine Classification"].value_counts().reset_index()
+    area_jobs.columns = ["Area", "Jobs"]
 
-        if "Minutes" in df_view.columns:
-            area_minutes = df_view.groupby("Machine Classification")["Minutes"].sum().reset_index()
-            area_minutes.columns = ["Area", "Minutes"]
-        else:
-            area_minutes = pd.DataFrame(columns=["Area", "Minutes"])
+    area_minutes = df_view.groupby("Machine Classification")["Minutes"].sum().reset_index()
+    area_minutes.columns = ["Area", "Minutes"]
 
-        col_a1, col_a2 = st.columns(2)
-        with col_a1:
-            fig_area_jobs = px.bar(
-                area_jobs,
-                x="Area",
-                y="Jobs",
-                title="Jobs by Area",
-            )
-            st.plotly_chart(fig_area_jobs, use_container_width=True)
-        with col_a2:
-            if not area_minutes.empty:
-                fig_area_min = px.bar(
-                    area_minutes,
-                    x="Area",
-                    y="Minutes",
-                    title="Minutes by Area",
-                )
-                st.plotly_chart(fig_area_min, use_container_width=True)
-            else:
-                st.info("No minutes data available for area analysis.")
-    else:
-        st.warning("Column 'Machine Classification' not found in data.")
+    col1, col2 = st.columns(2)
+    col1.plotly_chart(px.bar(area_jobs, x="Area", y="Jobs", title="Jobs by Area"), use_container_width=True)
+    col2.plotly_chart(px.bar(area_minutes, x="Area", y="Minutes", title="Minutes by Area"), use_container_width=True)
 
-# ---------- Tab 7: Raw Data ----------
+# ---------- Tab 7 ----------
 with tab7:
-    st.write("Cleaned raw data (after time processing):")
     st.dataframe(df_view, use_container_width=True)
