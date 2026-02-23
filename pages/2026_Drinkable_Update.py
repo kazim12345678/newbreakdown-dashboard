@@ -8,41 +8,48 @@ import re
 
 st.set_page_config(page_title="2026 Drinkable Update", layout="wide")
 
-DATA_PATH = "data/maintenance_data.xlsx"
-
 st.title("2026 Drinkable Maintenance Dashboard")
 
-# ===============================
-# LOAD FILE
-# ===============================
+DATA_PATH = "data/maintenance_data.xlsx"
+
+# =====================================================
+# SAFE EXCEL LOADER (AUTO HEADER DETECTION)
+# =====================================================
 
 def smart_load_excel(path):
-    raw = pd.read_excel(path, header=None)
+    try:
+        raw = pd.read_excel(path, header=None)
 
-    header_row_index = None
-    for i in range(len(raw)):
-        row_values = raw.iloc[i].astype(str).str.lower().tolist()
-        if any("date" in cell for cell in row_values):
-            header_row_index = i
-            break
+        header_row = None
+        for i in range(len(raw)):
+            row_values = raw.iloc[i].astype(str).str.lower().tolist()
+            if any("date" in cell for cell in row_values):
+                header_row = i
+                break
 
-    if header_row_index is None:
-        st.error("Header row not found.")
-        st.stop()
+        if header_row is None:
+            return pd.DataFrame()
 
-    df = pd.read_excel(path, header=header_row_index)
-    return df
+        df = pd.read_excel(path, header=header_row)
+        return df
+
+    except:
+        return pd.DataFrame()
 
 
 if not os.path.exists(DATA_PATH):
-    st.error("File not found in data/maintenance_data.xlsx")
+    st.warning("Excel file not found.")
     st.stop()
 
 df = smart_load_excel(DATA_PATH)
 
-# ===============================
+if df.empty:
+    st.warning("File loaded but no readable data found.")
+    st.stop()
+
+# =====================================================
 # CLEAN COLUMNS
-# ===============================
+# =====================================================
 
 df.columns = (
     df.columns
@@ -51,59 +58,38 @@ df.columns = (
     .str.strip()
 )
 
-# Remove unnamed columns
 df = df.loc[:, ~df.columns.str.contains("^Unnamed")]
 
-# ===============================
-# RENAME TO STANDARD
-# ===============================
+# =====================================================
+# STANDARDIZE KNOWN COLUMN VARIATIONS
+# =====================================================
 
-df.rename(columns={
+rename_map = {
     "Time Consumed (minute)": "Time Consumed",
-    "Maintenance Time": "Maintenance Time"
-}, inplace=True)
+    "Maintenance Time": "Maintenance Time",
+}
 
-required_columns = [
-    "Date",
-    "Machine No.",
-    "Notification No.",
-    "Shift",
-    "Area",
-    "Machine Classification",
-    "Job",
-    "Type",
-    "Reported Problem",
-    "Requested Time",
-    "Description Of Work",
-    "Spare Part Used",
-    "Time Consumed",
-    "Performed By",
-    "Remarks"
-]
+df.rename(columns=rename_map, inplace=True)
 
-missing = [col for col in required_columns if col not in df.columns]
+# =====================================================
+# SAFE DATE CONVERSION
+# =====================================================
 
-if missing:
-    st.error(f"Still missing columns: {missing}")
-    st.write("Detected columns:", df.columns.tolist())
-    st.stop()
+if "Date" in df.columns:
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
 
-# ===============================
-# DATA PREPARATION
-# ===============================
+if "Time Consumed" in df.columns:
+    df["Time Consumed"] = pd.to_numeric(df["Time Consumed"], errors="coerce").fillna(0)
+else:
+    df["Time Consumed"] = 0
 
-df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-
-df["Time Consumed"] = pd.to_numeric(df["Time Consumed"], errors="coerce")
-df["Time Consumed"] = df["Time Consumed"].fillna(0)
-
-# ===============================
-# MTD / YTD FILTER
-# ===============================
-
-col1, col2 = st.columns(2)
+# =====================================================
+# PERIOD FILTER
+# =====================================================
 
 today = pd.Timestamp.today()
+
+col1, col2 = st.columns(2)
 
 if "period" not in st.session_state:
     st.session_state.period = "ALL"
@@ -116,65 +102,89 @@ with col2:
     if st.button("YTD"):
         st.session_state.period = "YTD"
 
-if st.session_state.period == "MTD":
-    df = df[(df["Date"].dt.month == today.month) &
-            (df["Date"].dt.year == today.year)]
+if "Date" in df.columns:
+    if st.session_state.period == "MTD":
+        df = df[(df["Date"].dt.month == today.month) &
+                (df["Date"].dt.year == today.year)]
 
-elif st.session_state.period == "YTD":
-    df = df[df["Date"].dt.year == today.year]
+    elif st.session_state.period == "YTD":
+        df = df[df["Date"].dt.year == today.year]
 
-# ===============================
-# TECHNICIAN SPLIT
-# ===============================
+# =====================================================
+# MACHINE BREAKDOWN
+# =====================================================
 
-def split_tech(value):
-    if pd.isna(value):
-        return []
-    parts = re.split(r"/|and", str(value))
-    return [p.strip() for p in parts if p.strip()]
+if "Machine No." in df.columns:
+    st.markdown("## Machine Breakdown Frequency")
+    st.bar_chart(df["Machine No."].value_counts())
 
-tech_rows = []
+# =====================================================
+# JOB TYPE
+# =====================================================
 
-for _, row in df.iterrows():
-    techs = split_tech(row["Performed By"])
-    for tech in techs:
-        tech_rows.append({
-            "Technician": tech,
-            "Date": row["Date"],
-            "Minutes": row["Time Consumed"]
-        })
+if "Type" in df.columns:
+    st.markdown("## Job Type Analysis")
+    st.bar_chart(df["Type"].value_counts())
 
-tech_df = pd.DataFrame(tech_rows)
+# =====================================================
+# SPARE PARTS
+# =====================================================
 
-tech_summary = tech_df.groupby("Technician")["Minutes"].sum()
-tech_date_summary = tech_df.groupby(["Technician", "Date"])["Minutes"].sum().reset_index()
+if "Spare Part Used" in df.columns:
+    st.markdown("## Spare Parts Usage")
+    st.bar_chart(df["Spare Part Used"].value_counts())
 
-# ===============================
-# DASHBOARD
-# ===============================
+# =====================================================
+# NOTIFICATION PER MACHINE
+# =====================================================
 
-st.markdown("## Machine Breakdown Frequency")
-st.bar_chart(df["Machine No."].value_counts())
+if "Machine No." in df.columns and "Notification No." in df.columns:
+    st.markdown("## Notification Count per Machine")
+    st.bar_chart(df.groupby("Machine No.")["Notification No."].count())
 
-st.markdown("## Technician Performance (Total Minutes)")
-st.bar_chart(tech_summary)
+# =====================================================
+# NOTIFICATION PER DATE
+# =====================================================
 
-st.markdown("## Technician Performance Per Date")
-st.dataframe(tech_date_summary, use_container_width=True)
+if "Date" in df.columns and "Notification No." in df.columns:
+    st.markdown("## Notification Count per Date")
+    st.line_chart(df.groupby("Date")["Notification No."].count())
 
-st.markdown("## Job Type Analysis")
-st.bar_chart(df["Type"].value_counts())
+# =====================================================
+# TECHNICIAN PERFORMANCE (SAFE)
+# =====================================================
 
-st.markdown("## Spare Parts Usage")
-st.bar_chart(df["Spare Part Used"].value_counts())
+if "Performed By" in df.columns:
 
-st.markdown("## Notification Count per Machine")
-st.bar_chart(df.groupby("Machine No.")["Notification No."].count())
+    def split_tech(value):
+        if pd.isna(value) or str(value).strip() == "":
+            return []
+        parts = re.split(r"/|and|,", str(value))
+        return [p.strip() for p in parts if p.strip()]
 
-st.markdown("## Notification Count per Date")
-st.line_chart(df.groupby("Date")["Notification No."].count())
+    tech_rows = []
 
-st.markdown("## Remarks Count per Machine")
-st.bar_chart(df.groupby("Machine No.")["Remarks"].count())
+    for _, row in df.iterrows():
+        techs = split_tech(row["Performed By"])
+        for tech in techs:
+            tech_rows.append({
+                "Technician": tech,
+                "Date": row["Date"] if "Date" in df.columns else None,
+                "Minutes": row["Time Consumed"]
+            })
+
+    if len(tech_rows) > 0:
+        tech_df = pd.DataFrame(tech_rows)
+
+        st.markdown("## Technician Performance (Total Minutes)")
+        st.bar_chart(tech_df.groupby("Technician")["Minutes"].sum())
+
+# =====================================================
+# REMARKS COUNT
+# =====================================================
+
+if "Machine No." in df.columns and "Remarks" in df.columns:
+    st.markdown("## Remarks Count per Machine")
+    st.bar_chart(df.groupby("Machine No.")["Remarks"].count())
 
 st.success("Dashboard Loaded Successfully")
