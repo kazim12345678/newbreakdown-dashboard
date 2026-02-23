@@ -51,3 +51,9 @@ numpy
 plotly
 openpyxl
 xlsxwriter
+streamlit
+pandas
+numpy
+plotly
+openpyxl
+xlsxwriter
