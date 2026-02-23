@@ -216,14 +216,22 @@ with tabs[3]:
 
 # ---------- Notifications ----------
 with tabs[4]:
-    notif = safe_col(df_view, "Notification No.")
-    mach = safe_col(df_view, "Machine No.")
-    if notif.empty or mach.empty:
-        st.info("No notifications data.")
+    if ("Machine No." in df_view.columns) and ("Notification No." in df_view.columns):
+        if df_view.empty:
+            st.info("No data available for notifications.")
+        else:
+            notif_mach = (
+                df_view.groupby("Machine No.")["Notification No."]
+                .nunique()
+                .reset_index()
+            )
+            notif_mach.columns = ["Machine No.", "Unique Notifications"]
+            st.plotly_chart(
+                px.bar(notif_mach, x="Machine No.", y="Unique Notifications", title="Notifications per Machine"),
+                use_container_width=True
+            )
     else:
-        notif_mach = df_view.groupby("Machine No.")["Notification No."].nunique().reset_index()
-        notif_mach.columns = ["Machine No.", "Unique Notifications"]
-        st.plotly_chart(px.bar(notif_mach, x="Machine No.", y="Unique Notifications", title="Notifications per Machine"), use_container_width=True)
+        st.info("Notification or Machine No. column not available for notification analysis.")
 
 # ---------- Remarks ----------
 with tabs[5]:
@@ -242,7 +250,7 @@ with tabs[5]:
 
 # ---------- Hourly Breakdown ----------
 with tabs[6]:
-    if "Hour" in df_view.columns and "Machine No." in df_view.columns:
+    if ("Hour" in df_view.columns) and ("Machine No." in df_view.columns):
         hour_jobs = df_view.groupby("Hour")["Machine No."].count().reset_index()
         hour_jobs.columns = ["Hour", "Jobs"]
         st.plotly_chart(px.bar(hour_jobs, x="Hour", y="Jobs", title="Breakdowns by Hour"), use_container_width=True)
