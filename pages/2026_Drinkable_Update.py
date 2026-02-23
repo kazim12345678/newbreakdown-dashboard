@@ -1,124 +1,52 @@
-# pages/2026_Drinkable_Update.py
-
 import streamlit as st
 import pandas as pd
-import re
+import plotly.express as px
+import os
+from datetime import datetime
 
-st.set_page_config(page_title="2026 Drinkable Update", layout="wide")
-st.title("2026 Drinkable Maintenance Dashboard")
+# ----------------- PAGE CONFIG -----------------
+st.set_page_config(page_title="2026 – Drinkable Section Current Update", layout="wide")
+st.title("2026 – Drinkable Section Current Update")
 
-uploaded_file = st.file_uploader("Upload Maintenance Excel File", type=["xlsx"])
+DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "maintenance_data.xlsx")
 
-if uploaded_file is None:
-    st.stop()
 
-# ===============================
-# READ FILE SAFELY
-# ===============================
+# ----------------- SAFE HELPERS -----------------
 
-df = pd.read_excel(uploaded_file)
+def safe_col(df, col, default=""):
+    """Return a column safely. If missing, return empty column."""
+    if col in df.columns:
+        return df[col]
+    return pd.Series([default] * len(df))
 
-# Clean all column names safely
-df.columns = (
-    df.columns
-    .astype(str)
-    .str.strip()
-    .str.replace("\n", "")
-)
 
-# Make lowercase copy for searching
-lower_cols = {col.lower(): col for col in df.columns}
+def safe_time(series):
+    """Convert Excel float time or text to datetime safely."""
+    # Excel float time → convert to datetime
+    if series.dtype in ["float64", "int64"]:
+        return pd.to_datetime(series, unit="D", origin="1899-12-30", errors="coerce")
+    return pd.to_datetime(series, errors="coerce")
 
-# ===============================
-# SAFE COLUMN FINDER
-# ===============================
 
-def find_column(keyword):
-    for col in df.columns:
-        if keyword.lower() in col.lower():
-            return col
-    return None
+def safe_timedelta(series):
+    """Convert Excel float time or text to timedelta safely."""
+    if series.dtype in ["float64", "int64"]:
+        return pd.to_timedelta(series, unit="D", errors="coerce").fillna(pd.Timedelta(0))
+    td = pd.to_timedelta(series, errors="coerce")
+    return td.fillna(pd.Timedelta(0))
 
-date_col = find_column("date")
-machine_col = find_column("machine")
-type_col = find_column("type")
-spare_col = find_column("spare")
-notif_col = find_column("notification")
-tech_col = find_column("performed")
-time_col = find_column("time consumed")
 
-# ===============================
-# DATE CONVERSION (SAFE)
-# ===============================
+# ----------------- CLEANING -----------------
 
-if date_col:
-    df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
+def clean_data(df):
+    df.columns = [c.strip() for c in df.columns]
 
-if time_col:
-    df[time_col] = pd.to_timedelta(df[time_col], errors="coerce")
-    df["Minutes"] = df[time_col].dt.total_seconds() / 60
-    df["Minutes"] = df["Minutes"].fillna(0)
-else:
-    df["Minutes"] = 0
+    # Date (Excel float → real date)
+    df["Date"] = safe_time(safe_col(df, "Date"))
 
-# ===============================
-# MACHINE BREAKDOWN
-# ===============================
+    # Time fields (Excel float → real time)
+    df["Requested Time"] = safe_time(safe_col(df, "Requested Time"))
+    df["Start"] = safe_time(safe_col(df, "Start"))
+    df["End"] = safe_time(safe_col(df, "End"))
 
-if machine_col:
-    st.subheader("Machine Breakdown Frequency")
-    st.bar_chart(df[machine_col].value_counts())
-
-# ===============================
-# JOB TYPE
-# ===============================
-
-if type_col:
-    st.subheader("Job Type Analysis")
-    st.bar_chart(df[type_col].value_counts())
-
-# ===============================
-# SPARE PARTS
-# ===============================
-
-if spare_col:
-    st.subheader("Spare Parts Usage")
-    st.bar_chart(df[spare_col].value_counts())
-
-# ===============================
-# NOTIFICATION PER DATE
-# ===============================
-
-if date_col and notif_col:
-    st.subheader("Notification Count per Date")
-    st.line_chart(df.groupby(date_col)[notif_col].count())
-
-# ===============================
-# TECHNICIAN PERFORMANCE
-# ===============================
-
-if tech_col:
-
-    def split_tech(value):
-        if pd.isna(value):
-            return []
-        parts = re.split(r"/|,|&", str(value))
-        return [p.strip() for p in parts if p.strip()]
-
-    tech_rows = []
-
-    for _, row in df.iterrows():
-        techs = split_tech(row[tech_col])
-        for tech in techs:
-            tech_rows.append({
-                "Technician": tech,
-                "Minutes": row["Minutes"]
-            })
-
-    tech_df = pd.DataFrame(tech_rows)
-
-    if not tech_df.empty:
-        st.subheader("Technician Performance (Total Minutes)")
-        st.bar_chart(tech_df.groupby("Technician")["Minutes"].sum())
-
-st.success("Dashboard Loaded Successfully")
+    # Time Consumed
