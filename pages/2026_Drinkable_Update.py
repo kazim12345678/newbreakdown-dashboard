@@ -18,34 +18,39 @@ DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "maintenance_d
 
 # ----------------- HELPER FUNCTIONS -----------------
 
-def parse_time_column(series: pd.Series) -> pd.Series:
-    """Universal time parser for time-like columns."""
+def safe_get(df, col):
+    """Return column if exists, else return a column of NaT."""
+    if col in df.columns:
+        return df[col]
+    return pd.Series([pd.NaT] * len(df))
+
+
+def parse_time_column(series):
+    """Universal time parser."""
     return pd.to_datetime(series, errors="coerce")
 
 
-def clean_time_and_date(df: pd.DataFrame) -> pd.DataFrame:
-    """Clean Date and time columns, compute Minutes and Hour."""
+def clean_time_and_date(df):
+    """Clean Date and time columns safely."""
     df.columns = [c.strip() for c in df.columns]
 
     # Parse Date
     if "Date" in df.columns:
         df["Date"] = pd.to_datetime(df["Date"], errors="coerce", dayfirst=True)
+    else:
+        df["Date"] = pd.NaT
 
-    # Parse time-related columns
-    for col in ["Requested Time", "Start", "End"]:
-        if col in df.columns:
-            df[col] = parse_time_column(df[col])
+    # Parse Requested Time, Start, End safely
+    df["Requested Time"] = parse_time_column(safe_get(df, "Requested Time"))
+    df["Start"] = parse_time_column(safe_get(df, "Start"))
+    df["End"] = parse_time_column(safe_get(df, "End"))
 
-    # Convert Time Consumed safely
+    # Parse Time Consumed safely
     if "Time Consumed" in df.columns:
         df["Time Consumed"] = pd.to_timedelta(df["Time Consumed"], errors="coerce")
-
-        # Second attempt: parse raw strings
         df["Time Consumed"] = df["Time Consumed"].fillna(
             pd.to_timedelta(df["Time Consumed"].astype(str), errors="coerce")
         )
-
-        # Final fallback: replace NaT with 0 minutes
         df["Time Consumed"] = df["Time Consumed"].fillna(pd.Timedelta(seconds=0))
     else:
         df["Time Consumed"] = pd.Timedelta(seconds=0)
@@ -53,27 +58,22 @@ def clean_time_and_date(df: pd.DataFrame) -> pd.DataFrame:
     # Minutes
     df["Minutes"] = df["Time Consumed"].dt.total_seconds() / 60
 
-    # Hour extraction
-    if "Requested Time" in df.columns:
-        df["Hour"] = pd.to_datetime(df["Requested Time"], errors="coerce").dt.hour
-    else:
-        df["Hour"] = pd.to_datetime(df["Start"], errors="coerce").dt.hour
+    # Hour extraction (fallback logic)
+    df["Hour"] = df["Requested Time"].dt.hour
+    df.loc[df["Hour"].isna(), "Hour"] = df["Start"].dt.hour
+
+    df["Hour"] = df["Hour"].fillna(0).astype(int)
 
     return df
 
 
-def explode_technicians(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Split 'Performed By' into multiple rows.
-    Handles separators: '/', ' and ', '&'.
-    Each technician gets full Minutes credit.
-    """
+def explode_technicians(df):
+    """Split technicians by '/', 'and', '&'."""
     if "Performed By" not in df.columns:
         df["Performed By"] = ""
 
     df["Performed By"] = df["Performed By"].fillna("").astype(str)
 
-    # Normalize separators
     df["Performed_By_Normalized"] = (
         df["Performed By"]
         .str.replace(" and ", "/", case=False)
@@ -88,33 +88,27 @@ def explode_technicians(df: pd.DataFrame) -> pd.DataFrame:
     return df_exploded
 
 
-def load_saved_data() -> pd.DataFrame | None:
-    """Load saved Excel if exists."""
+def load_saved_data():
     if os.path.exists(DATA_PATH):
         return pd.read_excel(DATA_PATH)
     return None
 
 
-def save_data(df: pd.DataFrame):
-    """Save dataframe permanently."""
+def save_data(df):
     df.to_excel(DATA_PATH, index=False)
 
 
-def filter_mtd_ytd(df: pd.DataFrame, mode: str) -> pd.DataFrame:
-    """Filter dataframe for MTD or YTD."""
-    if "Date" not in df.columns or df["Date"].isna().all():
+def filter_mtd_ytd(df, mode):
+    if "Date" not in df.columns:
         return df
 
     today = datetime.today()
-    df = df.copy()
 
     if mode == "MTD":
-        mask = (df["Date"].dt.month == today.month)
-        return df[mask]
+        return df[df["Date"].dt.month == today.month]
 
     if mode == "YTD":
-        mask = (df["Date"].dt.year == today.year)
-        return df[mask]
+        return df[df["Date"].dt.year == today.year]
 
     return df
 
@@ -160,12 +154,8 @@ with col_all:
     if st.button("Show All"):
         filter_mode = "ALL"
 
-if filter_mode in ["MTD", "YTD"]:
-    df = filter_mtd_ytd(df, filter_mode)
-    df_tech = filter_mtd_ytd(df_tech, filter_mode)
-    st.info(f"Showing data filtered by: **{filter_mode}**")
-else:
-    st.info("Showing **all available data** (no MTD/YTD filter applied).")
+df = filter_mtd_ytd(df, filter_mode)
+df_tech = filter_mtd_ytd(df_tech, filter_mode)
 
 
 # ----------------- SIDEBAR FILTERS -----------------
@@ -238,8 +228,6 @@ with tab2:
 
         st.subheader("Technician Performance – Date-wise")
         st.dataframe(tech_date, use_container_width=True)
-    else:
-        st.warning("No technician data available.")
 
 # ---------- Tab 3 ----------
 with tab3:
