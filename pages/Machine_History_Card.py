@@ -160,3 +160,99 @@ if machine in history_data:
         st.text(history_data[machine]["raw"])
 else:
     st.info("Machine history not added yet. Please provide data.")
+    "M1": {
+    "summary": """
+### **M1 – Machine History Summary**
+
+#### **Capping System**
+- Frequent torque adjustments and capper head alignment.
+- Replaced capper piston assembly and lubricated capper assembly.
+- Repaired/replaced capper fingers, spindle, finger pins, and cap holder assemblies.
+- Adjusted cap sorter, cap chute, cap dispenser, and cap applicator timing.
+- Installed and fine‑tuned jaw air pressure regulator.
+- Repaired torque limiter and replaced defective limiter components.
+- Corrected capper #1 and #4 issues, including timing, torque, and alignment.
+- Fabricated bottle guide and adjusted bottle stopper guide.
+
+#### **Sensors & Electrical**
+- Reset multiple machine faults (stacker, capper, general faults).
+- Replaced defective sensors, cables, and solenoid coils (water‑damaged).
+- Fixed loose selector switch connection and reset tripped circuit breaker.
+- Rectified product level sensor and regulating valve issues.
+- Installed back detached air connector.
+
+#### **Conveyors & Mechanical**
+- Repaired broken conveyor links, sprockets, and overhead conveyor sections.
+- Released stuck conveyors and replaced damaged links.
+- Fixed crates conveyor and rebalanced crates lifter.
+- Repaired stacker system faults and mechanical issues.
+
+#### **Filler System**
+- Replaced broken filler pistons and adjusted filler cylinder rod.
+- Checked and repaired filler rod pin and cylinder alignment.
+
+#### **General Maintenance**
+- Released air locks and cleaned assemblies.
+- Removed broken bolts and reinstalled brackets.
+- Performed guide adjustments and general alignment corrections.
+    """,
+
+    "raw": """
+"to be updated"
+Adjusted the torque.
+Replaced the capper piston assembly due to detached from the assembly, replaced with spare assembly and adjusted timing.
+Lubricated the capper assembly.
+Alligned the capping head.
+Make alignment of capper head.
+Released air lock.
+Replaced broken nozzle pin.
+Checked and reset crates stacker system fault.
+Adjusted torque pressure.
+Fabricated capper bottle guide.
+Repaired cap holder assembly, finger cam need replacement.
+Done possible adjustment/allignment, capper fingers need replacement, no spare available.
+Replaced capper spindle with old spare and fine tuned capper jaw air pressure.
+Installed air regulator to regulate jaw air pressure.
+Removed broken conveyor link and reconnected.
+Adjusted the torque.
+Adjusted the cap sorter.
+Adjusted capper, need to replace finger.
+Done possible adjustment/allignment, capper fingers need replacement, no spare available.
+Replaced the finger using old spare.
+Troubleshoot the cause of not working in auto mode, found all solenoid valve penetrated with water, cleaned and replaced those corroded, rusty with spare coils.
+Fix damaged crates conveyor.
+Alligned the capper head and cap applicator.
+Adjusted the cap chute of capper.
+Adjusted the cap dispenser and repaired cap holder.
+Troubleshooting the cause of not opening of carriage plate.
+Reconnected broken overhead conveyor.
+Checked and adjusted all torque limitor and fine tuned air regulator.
+Checked and replaced broken filler piston.
+Fix the overhead conveyor sprocket.
+Released stucked up conveyor then replaced damaged link and reconnected.
+Replaced broken filler piston.
+Checked and adjusted filler cylinder rod.
+Checked and alligned capper head #1, adjusted height of cap dispenser and replaced capper finger pin.
+Reset the fault.
+Reset the stacker fault.
+Troublshoot the cause of not working in automatic operation and fix found loose connection of selector switch.
+Reset tripped off circuit breaker.
+Checked and replaced defective sensor and cable.
+Checked and adjusted torque of capper #1&4 then tightened gripper bolt.
+Checked and rectified product level sensor.
+Checked and adjusted product regulating valve for opening.
+Replaced defective torque limitor.
+Installed back detached air connector.
+Adjusted the bottle stopper guide.
+Replaced the message due to corrupted character.
+Done reset the fault.
+Checked and rectified capper #1.
+Checked and manually turned machine then reset VLT drive.
+Removed sliding plate bracket and extracted broken bolt then replaced bolt and installed back.
+Checked and rebalanced crates lifter then reset the fault.
+Checked and rectified capper issue.
+Weld the lock of cap applicator due to movement too much cause misalignment.
+Done adjusted the guides.
+Repaired the stacker problem.
+    """
+},
