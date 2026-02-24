@@ -1,3 +1,20 @@
+import streamlit as st
+
+st.set_page_config(page_title="Machine History Card", layout="wide")
+
+st.title("Machine History Card (MHC)")
+
+# -----------------------------
+# MACHINE SELECTION
+# -----------------------------
+machines = ["M1", "M2"]
+machine = st.selectbox("Select Machine", machines)
+
+st.markdown("---")
+
+# -----------------------------
+# MACHINE HISTORY DATA
+# -----------------------------
 history_data = {
 
     "M1": {
@@ -236,3 +253,15 @@ Fix the cylinder lock for nozzle.
     }
 
 }
+
+# -----------------------------
+# DISPLAY SELECTED MACHINE DATA
+# -----------------------------
+if machine in history_data:
+    st.subheader(f"Machine: {machine}")
+    st.markdown(history_data[machine]["summary"])
+
+    with st.expander("Show Raw Description of Work"):
+        st.text(history_data[machine]["raw"])
+else:
+    st.info("Machine history not added yet.")
