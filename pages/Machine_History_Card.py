@@ -1,26 +1,113 @@
-import streamlit as st
-
-st.set_page_config(page_title="Machine History Card", layout="wide")
-
-st.title("Machine History Card (MHC)")
-
-# -----------------------------
-# MACHINE SELECTION
-# -----------------------------
-machines = [
-    "M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9",
-    "M10", "M11", "M12", "M13", "M14", "M15", "M16", "M17", "M18",
-    "Crates Area/Line"
-]
-
-machine = st.selectbox("Select Machine", machines)
-
-st.markdown("---")
-
-# -----------------------------
-# MACHINE HISTORY DATA STORAGE
-# -----------------------------
 history_data = {
+
+    "M1": {
+        "summary": """
+### **M1 – Machine History Summary**
+
+#### **Capping System**
+- Multiple capper head alignments and timing adjustments.
+- Repaired/replaced capper fingers, finger cams, cap holder assemblies, and capper piston springs.
+- Adjusted torque limiter, torque pressure, and starwheel timing (#5 and outfeed).
+- Repaired cap dispenser, cap chute, cap applicator, and bottle stopper guides.
+- Installed and lubricated solenoid valves for capper operations.
+- Replaced torque limiters (multiple instances).
+- Corrected capper #1 issues and retimed capper assemblies.
+
+#### **Sensors & Electrical**
+- Replaced defective sensors, cables, and crates gate sensors.
+- Reset stacker faults and breaker trips.
+- Replaced magnetic contactor and fixed shorted motor cable.
+- Cleaned and lubricated solenoid valves; fixed air leaks.
+- Repaired TES net card communication and downloaded program.
+- Replaced stacker door switch and bottle stopper cylinder bracket.
+
+#### **Conveyors & Mechanical**
+- Repaired broken conveyors, damaged links, sprockets, and derailed outfeed conveyors.
+- Reconnected packer crates conveyor and fixed crates lifter plate.
+- Aligned drive sprocket and adjusted conveyor belts.
+- Welded broken carriage plate parts and reinstalled.
+- Repaired C‑loop pusher and packer crates conveyor.
+
+#### **Filler & Bottle Handling**
+- Repaired nozzle leakage and removed clogged gasket.
+- Checked and replaced filler pistons and adjusted cylinder rods.
+- Fixed bottle stopper and bottle sensor alignment.
+
+#### **General Maintenance**
+- Cleaned carbon brushes, adjusted brush length, and reinstalled collectors.
+- Fixed air hose leaks and replaced hose fittings.
+- Reset multiple faults (stacker, capper, general).
+- Attempted VFD installation (drive failed; pending rectification).
+- Installed back detached mechanical components (rollers, brackets, cylinders).
+        """,
+
+        "raw": """
+"to be updated"
+"to be updated"
+Make solution on the side of pulley due to adjustment already touch on the plate, removed the side of plate to adjust the tension.
+Need to replace finger.
+Reconnected packer crates conveyor.
+Done tensioning of bottle cable conveyor.
+"to be updated"
+Repaired the broken conveyor.
+Replaced defective crates gate sensor.
+Alligned bottle sensor.
+Reset crates stacker fault.
+Checked and need to replace finger cam but no spare available.
+Make remedy on the cap holder finger, no spare finger cam.
+Adjusted the conveyor belt.
+Fix plastic guide and installed back derailed outfeed conveyor.
+Repaired nozzle leakage, removed clogged gasket.
+Adjusted the sensor.
+Fix the crates lifter plate.
+Replaced damaged hose fitting of stopper cylinder.
+Checked and replaced solenoid valve using old spare.
+Checked and lubricated all solenoid valve.
+Fix air leakage.
+Adjusted the timing of starwheel #5.
+Fix the air leakage.
+Lubricated the solenoid valve for bottle stopper.
+Checked and replaced damaged cable sensor.
+Removed damaged link then reconnected conveyor.
+Alligned the drive sprocket.
+Replaced torque limitor.
+Replaced torque limitor.
+Tried to install VFD to reduce speed of conveyor but faiield to run drive, for rectifiecation.
+Replaced defective sensor.
+Replaced defective stacker door switch.
+Replaced cut stacker left side lifting belt.
+Checked and installed back detached crates pusher and replaced busted sensor.
+Checked and repaired labelling machine.
+Fix damaged conveyor.
+Fix damaged packer crates conveyor.
+Adjusted the divider sensor to activate.
+Repaired cap holder assembly.
+Removed carriage plate and bring to workshop to weld broken part, fix back.
+Checked and reset stacker fault.
+Cleaned carbon brushes and adjusted the carbon brushes length.
+Replaced worn out capper piston spring.
+Fix air leakage.
+Work continuation, installed back detached/fell down carbon brushes and collectors assembly.
+Checked and cleaned carbon brushes.
+Checked and repaired packer bottle stopper.
+Checked and found motor overload of cap elevator, checked the motor condition, secured connection of the motor.
+Reset the breaker.
+Replaced the magnetic contactor.
+Reset the breaker.
+Fix the shorted wire of motor cable.
+Troubleshoot the cause of not filling all station, checked carbon brushes & communication cables then cleaned, change also TES net card, downloaded program and test.
+Replaced defective sensor and cable.
+Done fix air hose.
+Adjusted the timing of starwheel.
+Replaced the printer by spare printer from M9 due to pressure fault.
+Replaced sensor cable and sensor, also bracker of cylinder for bottle stopper.
+Fix the detached cylinder end of carriage.
+Checked and retiming outfeed starwheel.
+Checked and installed back detached roller bracket.
+Repaired c-loop pusher.
+        """
+    },
+
     "M2": {
         "summary": """
 ### **M2 – Machine History Summary**
@@ -147,112 +234,5 @@ Checked and provided lock pin for cylinder clevis.
 Fix the cylinder lock for nozzle.
         """
     }
+
 }
-
-# -----------------------------
-# DISPLAY SELECTED MACHINE DATA
-# -----------------------------
-if machine in history_data:
-    st.subheader(f"Machine: {machine}")
-    st.markdown(history_data[machine]["summary"])
-
-    with st.expander("Show Raw Description of Work"):
-        st.text(history_data[machine]["raw"])
-else:
-    st.info("Machine history not added yet. Please provide data.")
-    "M1": {
-    "summary": """
-### **M1 – Machine History Summary**
-
-#### **Capping System**
-- Frequent torque adjustments and capper head alignment.
-- Replaced capper piston assembly and lubricated capper assembly.
-- Repaired/replaced capper fingers, spindle, finger pins, and cap holder assemblies.
-- Adjusted cap sorter, cap chute, cap dispenser, and cap applicator timing.
-- Installed and fine‑tuned jaw air pressure regulator.
-- Repaired torque limiter and replaced defective limiter components.
-- Corrected capper #1 and #4 issues, including timing, torque, and alignment.
-- Fabricated bottle guide and adjusted bottle stopper guide.
-
-#### **Sensors & Electrical**
-- Reset multiple machine faults (stacker, capper, general faults).
-- Replaced defective sensors, cables, and solenoid coils (water‑damaged).
-- Fixed loose selector switch connection and reset tripped circuit breaker.
-- Rectified product level sensor and regulating valve issues.
-- Installed back detached air connector.
-
-#### **Conveyors & Mechanical**
-- Repaired broken conveyor links, sprockets, and overhead conveyor sections.
-- Released stuck conveyors and replaced damaged links.
-- Fixed crates conveyor and rebalanced crates lifter.
-- Repaired stacker system faults and mechanical issues.
-
-#### **Filler System**
-- Replaced broken filler pistons and adjusted filler cylinder rod.
-- Checked and repaired filler rod pin and cylinder alignment.
-
-#### **General Maintenance**
-- Released air locks and cleaned assemblies.
-- Removed broken bolts and reinstalled brackets.
-- Performed guide adjustments and general alignment corrections.
-    """,
-
-    "raw": """
-"to be updated"
-Adjusted the torque.
-Replaced the capper piston assembly due to detached from the assembly, replaced with spare assembly and adjusted timing.
-Lubricated the capper assembly.
-Alligned the capping head.
-Make alignment of capper head.
-Released air lock.
-Replaced broken nozzle pin.
-Checked and reset crates stacker system fault.
-Adjusted torque pressure.
-Fabricated capper bottle guide.
-Repaired cap holder assembly, finger cam need replacement.
-Done possible adjustment/allignment, capper fingers need replacement, no spare available.
-Replaced capper spindle with old spare and fine tuned capper jaw air pressure.
-Installed air regulator to regulate jaw air pressure.
-Removed broken conveyor link and reconnected.
-Adjusted the torque.
-Adjusted the cap sorter.
-Adjusted capper, need to replace finger.
-Done possible adjustment/allignment, capper fingers need replacement, no spare available.
-Replaced the finger using old spare.
-Troubleshoot the cause of not working in auto mode, found all solenoid valve penetrated with water, cleaned and replaced those corroded, rusty with spare coils.
-Fix damaged crates conveyor.
-Alligned the capper head and cap applicator.
-Adjusted the cap chute of capper.
-Adjusted the cap dispenser and repaired cap holder.
-Troubleshooting the cause of not opening of carriage plate.
-Reconnected broken overhead conveyor.
-Checked and adjusted all torque limitor and fine tuned air regulator.
-Checked and replaced broken filler piston.
-Fix the overhead conveyor sprocket.
-Released stucked up conveyor then replaced damaged link and reconnected.
-Replaced broken filler piston.
-Checked and adjusted filler cylinder rod.
-Checked and alligned capper head #1, adjusted height of cap dispenser and replaced capper finger pin.
-Reset the fault.
-Reset the stacker fault.
-Troublshoot the cause of not working in automatic operation and fix found loose connection of selector switch.
-Reset tripped off circuit breaker.
-Checked and replaced defective sensor and cable.
-Checked and adjusted torque of capper #1&4 then tightened gripper bolt.
-Checked and rectified product level sensor.
-Checked and adjusted product regulating valve for opening.
-Replaced defective torque limitor.
-Installed back detached air connector.
-Adjusted the bottle stopper guide.
-Replaced the message due to corrupted character.
-Done reset the fault.
-Checked and rectified capper #1.
-Checked and manually turned machine then reset VLT drive.
-Removed sliding plate bracket and extracted broken bolt then replaced bolt and installed back.
-Checked and rebalanced crates lifter then reset the fault.
-Checked and rectified capper issue.
-Weld the lock of cap applicator due to movement too much cause misalignment.
-Done adjusted the guides.
-Repaired the stacker problem.
-    """
-},
