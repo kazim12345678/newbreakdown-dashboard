@@ -1,171 +1,159 @@
-# pages/01_Master_List_of_Equipment.py
-
 import streamlit as st
 import pandas as pd
 import os
 
 st.set_page_config(page_title="Master List of Equipment", layout="wide")
+st.title("Master Equipment Manager")
 
-st.title("Master List of Equipment")
-
-# =========================================================
-# FILE PATHS (Permanent Storage)
-# =========================================================
-
-PRINTER_FILE = "master_printer_list.csv"
 MACHINE_FILE = "master_machine_list.csv"
+PRINTER_FILE = "master_printer_list.csv"
 
-# =========================================================
-# LOAD EXISTING DATA IF AVAILABLE
-# =========================================================
+# ==========================================================
+# LOAD OR INITIALIZE MACHINE DATA
+# ==========================================================
 
-if os.path.exists(PRINTER_FILE):
-    printer_df = pd.read_csv(PRINTER_FILE)
-else:
-    printer_df = pd.DataFrame(columns=[
-        "Machine No",
-        "Printer Company",
-        "Printer Model",
-        "Serial Number",
-        "Quantity"
-    ])
+if "machines" not in st.session_state:
 
-if os.path.exists(MACHINE_FILE):
-    machine_df = pd.read_csv(MACHINE_FILE)
-else:
-    machine_df = pd.DataFrame(columns=[
-        "Machine No",
-        "Model Name",
-        "Machine ID",
-        "Model Code",
-        "Filling Type",
-        "IP Address",
-        "In-Service Date",
-        "Machine Switch-On Hours",
-        "Machine Rotation Hours",
-        "Filled Containers"
-    ])
+    if os.path.exists(MACHINE_FILE):
+        st.session_state.machines = pd.read_csv(MACHINE_FILE)
+    else:
+        machine_data = [
+            ["M1","FCS+ 6.2 CR 10","0393-0H09-W88U_ID109","1095 - R18/1080 V9 Mec GD 10kg PW20","TOR","127.0.0.1","2018-05-29",133214,67494,174085910],
+            ["M2","FCS+ 6.2 CR/17","078Z-W9AZ ID1180","1180 - R18/1080 V9 Mec GD 3.3kg PW-10","TOR","127.0.0.1","2019-02-05",12172,7446,13930490],
+            ["M3","FCS+ 6.2 CR 17","D784-W9AY-ID1034","1034 - R8/720 V4 Mec GD 3kg PW10","TOR","127.0.0.1","2019-02-04",126016,57500,189700750],
+            ["M4","FCS+ 6.2 CR 10","D197-W87T_ID1333","1333 - R8/720 V4 Mec GD 4kg(3kg) PW10","TOOR","127.0.0.1","2018-05-29",36586,18842,58650901],
+            ["M5","FCS+ 6.0 CR 8","0F18-W1ZD_ID57","057 - R18/1080 V9 Mec GD 3kg","TOR","127.0.0.1","2015-03-12",76735,36384,95461227],
+            ["M6","FCS+ 6.0 CR 12","0MW2-W25L_ID613","613 - R3G/1620 V16 Mtec GD 3kg PWM10 MFAS","MULTIFLOW AS","127.0.0.1","2015-07-29",76728,37440,619740035],
+            ["M7","FCS+ 6.0 CR 12","#ID436 - 0M2E","608 - R45/2700 V12 Mec GD 3kg PW10 MFAS","MULTIFLOW AS","127.0.0.1","2015-07-27",110257,57766,413015663],
+            ["M8","FCS+ 6.0 CR 7","0F24-W12C_ID4","004 - R16/720 V8 Mec GD 3kg","TOR","127.0.0.1","2015-02-25",52501,28007,168139993],
+            ["M9","FCS+ 6.0 CR 1","0D27HD151","151 - R16/720 V8 Mec GD 3kg PW10","TOR","127.0.0.1","2014-02-27",125648,65566,394937594],
+            ["M10","FCS+ 6.0 CR 12","0M01-W25K-ID612","630 - R36/1620 V16 UCB DG 3kg PW10 MFAS","MULTIFLOW AS","127.0.0.1","2015-07-29",182730,18385,241007795],
+            ["M11","FCS+ 6.0 CR 12","0M01-W25K-ID612","630 - R25/1602 V16 UCB DG 3kg PW10 MFAS","MULTIFLOW AS","127.0.0.1","2015-07-29",182652,18351,240644255],
+            ["M12","FCS+ 6.0 CR 12","0M2F-W25L_ID613","613 - R36/1620 V16 Mec GD 3kg PW10 MFAS","MULTIFLOW AS","127.0.0.1","2015-07-29",76653,37421,615495135],
+            ["M13","FCS+ 6.0 CR 8","0F18-W1ZD_ID57","057 - R18/1080 V9 Mec GD 3kg","TOR","127.0.0.1","2015-03-12",76641,36343,95368919],
+            ["M14","FCS+ 6.2 CR 17","0784-WSAY_ID1034","1034 - R8/720 V4 Mec GD 3kg PW10","TOR","127.0.0.1","2019-02-04",125922,57452,18956152],
+            ["M15","FCS+ 6.1 CR 10","0M93 - ID1008","1008 - R30/1080 V15 Mec GD 3kg(2kg) PW27 MFAS H2F","MULTIFLOW AS","127.0.0.1","2015-10-20",2390,783,12870533],
+            ["M16","FCS+ 6.1 CR 10","0M92 - ID1008","1008 - R30/1080 V15 Mec GD 3kg(2kg) PW27 MFAS H2F","MULTIFLOW AS","127.0.0.1","2015-10-20",3899,1208,16516564],
+            ["M17","FCS+ 6.0 CR 15","0M6XID518","518 - R30/1080 V15 Mec GD 3kg(2kg) PW27 MFAS","MULTIFLOW AS","127.0.0.1","2014-07-04",243380,205482,47208836],
+            ["M18","New Machine","Not Assigned","-","-","-","2024-01-01",0,0,0],
+        ]
 
-# =========================================================
-# PRINTER MASTER SECTION
-# =========================================================
+        st.session_state.machines = pd.DataFrame(machine_data, columns=[
+            "Machine No","Model Name","Machine ID","Model Code",
+            "Filling Type","IP Address","In-Service Date",
+            "Machine Switch-On Hours","Machine Rotation Hours","Filled Containers"
+        ])
 
-st.header("Printer Master List")
+# ==========================================================
+# LOAD OR INITIALIZE PRINTER DATA
+# ==========================================================
 
-with st.form("printer_form"):
-    col1, col2, col3, col4, col5 = st.columns(5)
+if "printers" not in st.session_state:
 
-    machine_no = col1.text_input("Machine No")
-    company = col2.text_input("Printer Company")
-    model = col3.text_input("Printer Model")
-    serial = col4.text_input("Serial Number")
-    quantity = col5.number_input("Quantity", min_value=1, step=1)
+    if os.path.exists(PRINTER_FILE):
+        st.session_state.printers = pd.read_csv(PRINTER_FILE)
+    else:
+        printer_data = [
+            ["M1","Citronix","ci5500","0723178D",1],
+            ["M2","Citronix","ci5500","0723178D",1],
+            ["M3","Citronix","ci5500","0723178D",1],
+            ["M4","Citronix","ci5500","0723178D",1],
+            ["Not Assigned","Citronix","ci5500","0725037J",1],
+            ["Not Assigned","Citronix","ci5500","0725006D",1],
+            ["Not Assigned","Citronix","ci5500","0724332B",1],
+            ["Not Assigned","Citronix","ci5500","Serial Hidden",1],
+            ["Not Assigned","Citronix","ci3500","05230C",1],
+            ["Not Assigned","Citronix","CI3500 (BI)","0516230B",1],
+        ]
 
-    printer_submit = st.form_submit_button("Add Printer")
+        st.session_state.printers = pd.DataFrame(printer_data, columns=[
+            "Machine No","Printer Company","Printer Model","Serial Number","Quantity"
+        ])
 
-    if printer_submit:
-        new_row = pd.DataFrame([{
-            "Machine No": machine_no,
-            "Printer Company": company,
-            "Printer Model": model,
-            "Serial Number": serial,
-            "Quantity": quantity
-        }])
+# ==========================================================
+# MACHINE SELECTION
+# ==========================================================
 
-        printer_df = pd.concat([printer_df, new_row], ignore_index=True)
-        st.success("Printer Added Successfully")
+st.header("Select Machine")
 
-# Save Button for Printer
-if st.button("Save Printer List Permanently"):
-    printer_df.to_csv(PRINTER_FILE, index=False)
-    st.success("Printer Master List Saved Permanently")
+machine_list = st.session_state.machines["Machine No"].tolist()
+cols = st.columns(6)
 
-st.dataframe(printer_df, use_container_width=True)
+for i, m in enumerate(machine_list):
+    if cols[i % 6].button(m):
+        st.session_state.selected = m
 
-st.download_button(
-    "Download Printer Master List",
-    printer_df.to_csv(index=False),
-    "Printer_Master_List.csv",
-    "text/csv"
-)
+# ==========================================================
+# MACHINE DETAILS
+# ==========================================================
 
-st.divider()
+if "selected" in st.session_state:
 
-# =========================================================
-# MACHINE MASTER SECTION
-# =========================================================
+    selected_machine = st.session_state.selected
+    st.subheader(f"Machine Details: {selected_machine}")
 
-st.header("Machine Master List")
+    machine_data = st.session_state.machines[
+        st.session_state.machines["Machine No"] == selected_machine
+    ]
 
-with st.form("machine_form"):
+    edited_machine = st.data_editor(machine_data, num_rows="dynamic")
 
-    col1, col2, col3 = st.columns(3)
-    m_no = col1.text_input("Machine No")
-    model_name = col2.text_input("Model Name")
-    machine_id = col3.text_input("Machine ID")
+    col1, col2 = st.columns(2)
 
-    col4, col5, col6 = st.columns(3)
-    model_code = col4.text_input("Model Code")
-    filling_type = col5.text_input("Filling Type")
-    ip_address = col6.text_input("IP Address")
+    with col1:
+        if st.button("Save Machine Changes"):
+            st.session_state.machines.update(edited_machine)
+            st.session_state.machines.to_csv(MACHINE_FILE, index=False)
+            st.success("Machine updated & saved permanently")
 
-    col7, col8, col9 = st.columns(3)
-    in_service = col7.date_input("In-Service Date")
-    switch_on = col8.number_input("Machine Switch-On Hours", min_value=0)
-    rotation = col9.number_input("Machine Rotation Hours", min_value=0)
+    with col2:
+        if st.button("Delete Machine"):
+            st.session_state.machines = st.session_state.machines[
+                st.session_state.machines["Machine No"] != selected_machine
+            ]
+            st.session_state.machines.to_csv(MACHINE_FILE, index=False)
+            st.success("Machine deleted & saved permanently")
+            st.rerun()
 
-    filled_containers = st.number_input("Filled Containers", min_value=0)
+    st.divider()
 
-    machine_submit = st.form_submit_button("Add Machine")
+    # ======================================================
+    # PRINTERS SECTION
+    # ======================================================
 
-    if machine_submit:
-        new_machine = pd.DataFrame([{
-            "Machine No": m_no,
-            "Model Name": model_name,
-            "Machine ID": machine_id,
-            "Model Code": model_code,
-            "Filling Type": filling_type,
-            "IP Address": ip_address,
-            "In-Service Date": in_service,
-            "Machine Switch-On Hours": switch_on,
-            "Machine Rotation Hours": rotation,
-            "Filled Containers": filled_containers
-        }])
+    st.subheader("Related Printers")
 
-        machine_df = pd.concat([machine_df, new_machine], ignore_index=True)
-        st.success("Machine Added Successfully")
+    printer_data = st.session_state.printers[
+        st.session_state.printers["Machine No"] == selected_machine
+    ]
 
-# Save Button for Machine
-if st.button("Save Machine List Permanently"):
-    machine_df.to_csv(MACHINE_FILE, index=False)
-    st.success("Machine Master List Saved Permanently")
+    edited_printers = st.data_editor(printer_data, num_rows="dynamic")
 
-st.dataframe(machine_df, use_container_width=True)
+    col3, col4 = st.columns(2)
 
-st.download_button(
-    "Download Machine Master List",
-    machine_df.to_csv(index=False),
-    "Machine_Master_List.csv",
-    "text/csv"
-)
+    with col3:
+        if st.button("Save Printer Changes"):
+            st.session_state.printers = st.session_state.printers[
+                st.session_state.printers["Machine No"] != selected_machine
+            ]
+            st.session_state.printers = pd.concat(
+                [st.session_state.printers, edited_printers],
+                ignore_index=True
+            )
+            st.session_state.printers.to_csv(PRINTER_FILE, index=False)
+            st.success("Printers updated & saved permanently")
 
-st.divider()
+    with col4:
+        if st.button("Add New Printer"):
+            new_row = pd.DataFrame(
+                [[selected_machine,"","","",1]],
+                columns=st.session_state.printers.columns
+            )
+            st.session_state.printers = pd.concat(
+                [st.session_state.printers,new_row],
+                ignore_index=True
+            )
+            st.session_state.printers.to_csv(PRINTER_FILE, index=False)
+            st.rerun()
 
-# =========================================================
-# SUMMARY SECTION
-# =========================================================
-
-st.header("Summary")
-
-colA, colB, colC = st.columns(3)
-
-colA.metric("Total Printers", len(printer_df))
-colB.metric("Total Machines", len(machine_df))
-
-if "Filled Containers" in machine_df.columns:
-    colC.metric(
-        "Total Filled Containers",
-        int(machine_df["Filled Containers"].sum())
-    )
-
-st.success("Master Equipment Page Ready and Fully Functional")
+st.success("Master Equipment Management System Ready ✅")
