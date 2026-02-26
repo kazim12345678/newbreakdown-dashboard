@@ -1,106 +1,90 @@
-import streamlit as st
 import pandas as pd
-import plotly.express as px
+import numpy as np
 
-st.set_page_config(page_title="Maintenance KPI Dashboard", layout="wide")
-st.title("Maintenance KPI Dashboard")
+# Load Excel file
+file_path = "log sheet for copilot.xlsx"
+df = pd.read_excel(file_path)
 
-# ---------- FILE UPLOAD ----------
-uploaded_file = st.file_uploader("Upload Maintenance Excel File", type=["xlsx"])
+# Normalize column names
+df.columns = [c.strip().lower() for c in df.columns]
 
-if not uploaded_file:
-    st.stop()
+kpi_results = []
 
-# ---------- LOAD CORRECT SHEET ----------
-df = pd.read_excel(uploaded_file, sheet_name=0)
-df.columns = df.columns.str.strip()
+def col_exists(name):
+    return name.lower() in df.columns
 
-# ---------- SAFE TIME CONVERSION ----------
-def excel_time_to_minutes(x):
-    if pd.isna(x):
-        return 0
-    if isinstance(x, (int, float)):
-        return x * 24 * 60   # Excel day fraction → minutes
-    try:
-        return pd.to_timedelta(x).total_seconds() / 60
-    except:
-        return 0
+# -------------------------------
+# BASIC KPIs
+# -------------------------------
+kpi_results.append(("Total Jobs", len(df)))
 
-if "Time Consumed" in df.columns:
-    df["Minutes"] = df["Time Consumed"].apply(excel_time_to_minutes)
-else:
-    df["Minutes"] = 0
+# Job Type KPIs
+if col_exists("job"):
+    kpi_results.append(("Breakdown Jobs (B/D)", (df["job"].astype(str).str.upper() == "B/D").sum()))
+    kpi_results.append(("Corrective Jobs", (df["job"].astype(str).str.upper() == "CORRECTIVE").sum()))
 
-# ---------- BASIC CLEAN ----------
-df["Job"] = df.get("Job", "")
-df["Shift"] = df.get("Shift", "")
-df["Machine No."] = df.get("Machine No.", "")
+# -------------------------------
+# TIME KPIs
+# -------------------------------
+time_col = None
+for c in ["time consumed", "maintenance time", "time consumed (minute)"]:
+    if col_exists(c):
+        time_col = c
+        break
 
-# ---------- KPI CALCULATIONS ----------
-total_jobs = len(df)
-breakdown_jobs = (df["Job"] == "B/D").sum()
-corrective_jobs = (df["Job"] == "Corrective").sum()
-total_downtime = df["Minutes"].sum()
-avg_mttr = df["Minutes"].mean()
+if time_col:
+    df[time_col] = pd.to_numeric(df[time_col], errors="coerce")
+    total_hours = df[time_col].sum()
+    avg_time = df[time_col].mean()
+    kpi_results.append(("Total Maintenance Time (Hours)", round(total_hours, 2)))
+    kpi_results.append(("Average Repair Time - MTTR (Hours)", round(avg_time, 2)))
 
-# ---------- KPI DISPLAY ----------
-c1, c2, c3, c4, c5 = st.columns(5)
-c1.metric("Total Jobs", total_jobs)
-c2.metric("Breakdowns", breakdown_jobs)
-c3.metric("Corrective", corrective_jobs)
-c4.metric("Total Downtime (min)", int(total_downtime))
-c5.metric("Avg MTTR (min)", round(avg_mttr, 1))
-
-st.divider()
-
-# ---------- MACHINE ANALYSIS ----------
-st.subheader("Machine Analysis")
-
-mach_jobs = df["Machine No."].value_counts().reset_index()
-mach_jobs.columns = ["Machine", "Jobs"]
-
-mach_time = df.groupby("Machine No.")["Minutes"].sum().reset_index()
-mach_time.columns = ["Machine", "Downtime"]
-
-fig1 = px.bar(mach_jobs, x="Machine", y="Jobs", title="Jobs per Machine")
-fig2 = px.bar(mach_time, x="Machine", y="Downtime", title="Downtime per Machine")
-
-st.plotly_chart(fig1, use_container_width=True)
-st.plotly_chart(fig2, use_container_width=True)
-
-# ---------- SHIFT ANALYSIS ----------
-st.subheader("Shift Analysis")
-
-shift_jobs = df["Shift"].value_counts().reset_index()
-shift_jobs.columns = ["Shift", "Jobs"]
-
-shift_time = df.groupby("Shift")["Minutes"].sum().reset_index()
-shift_time.columns = ["Shift", "Downtime"]
-
-fig3 = px.bar(shift_jobs, x="Shift", y="Jobs", title="Jobs per Shift")
-fig4 = px.bar(shift_time, x="Shift", y="Downtime", title="Downtime per Shift")
-
-st.plotly_chart(fig3, use_container_width=True)
-st.plotly_chart(fig4, use_container_width=True)
-
-# ---------- TECHNICIAN ANALYSIS ----------
-if "Performed By" in df.columns:
-    tech_df = df.copy()
-    tech_df["Tech"] = tech_df["Performed By"].fillna("").str.split("/")
-    tech_df = tech_df.explode("Tech")
-    tech_df["Tech"] = tech_df["Tech"].str.strip()
-    tech_df = tech_df[tech_df["Tech"] != ""]
-
-    tech_time = tech_df.groupby("Tech")["Minutes"].sum().reset_index()
-
-    fig5 = px.bar(
-        tech_time,
-        x="Tech",
-        y="Minutes",
-        title="Downtime per Technician"
+# -------------------------------
+# MACHINE KPIs
+# -------------------------------
+if col_exists("machine no.") and time_col:
+    machine_downtime = (
+        df.groupby("machine no.")[time_col]
+        .sum()
+        .sort_values(ascending=False)
+        .head(5)
     )
-    st.plotly_chart(fig5, use_container_width=True)
 
-# ---------- RAW DATA ----------
-st.subheader("Raw Data")
-st.dataframe(df, use_container_width=True)
+    for i, (machine, hours) in enumerate(machine_downtime.items(), start=1):
+        kpi_results.append((f"Top {i} Machine by Downtime", f"{machine} ({round(hours,2)} hrs)"))
+
+# -------------------------------
+# SHIFT KPIs
+# -------------------------------
+if col_exists("shift"):
+    shift_counts = df["shift"].value_counts()
+    for shift, count in shift_counts.items():
+        kpi_results.append((f"Jobs in {shift} Shift", count))
+
+# -------------------------------
+# AREA KPIs
+# -------------------------------
+if col_exists("area"):
+    area_counts = df["area"].value_counts().head(5)
+    for area, count in area_counts.items():
+        kpi_results.append((f"Jobs in Area: {area}", count))
+
+# -------------------------------
+# JOB TYPE KPIs (Mech / Elect / etc.)
+# -------------------------------
+if col_exists("type"):
+    type_counts = df["type"].value_counts()
+    for t, count in type_counts.items():
+        kpi_results.append((f"Jobs Type: {t}", count))
+
+# -------------------------------
+# CREATE KPI TABLE
+# -------------------------------
+kpi_df = pd.DataFrame(kpi_results, columns=["KPI", "Value"])
+
+# Write KPIs back into the SAME sheet (right side)
+with pd.ExcelWriter(file_path, engine="openpyxl", mode="a", if_sheet_exists="overlay") as writer:
+    df.to_excel(writer, index=False, sheet_name="Main Data")
+    kpi_df.to_excel(writer, index=False, sheet_name="Main Data", startcol=len(df.columns) + 2)
+
+print("✅ KPI generation completed successfully")
