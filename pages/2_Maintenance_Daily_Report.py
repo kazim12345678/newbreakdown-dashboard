@@ -1,28 +1,28 @@
+import streamlit as st
 import pandas as pd
 import numpy as np
 
-# ======================================================
-# GET DATA (SAFE – NO FILE PATHS)
-# ======================================================
-
-# OPTION 1: Streamlit (most common)
-if "data" in globals():
-    df = data.copy()
-elif "st" in globals() and "data" in st.session_state:
-    df = st.session_state["data"].copy()
-
-# OPTION 2: Python in Excel
-elif "xl" in globals():
-    df = xl("Main Data[#All]", headers=True)
-
-else:
-    raise RuntimeError("❌ No active data source found")
+st.title("Maintenance Daily KPI Report")
 
 # ======================================================
-# CLEAN COLUMN NAMES
+# LOAD EXCEL FILE (STREAMLIT SAFE)
 # ======================================================
+uploaded_file = st.file_uploader(
+    "Upload Maintenance Log Sheet",
+    type=["xlsx"]
+)
+
+if uploaded_file is None:
+    st.info("⬆️ Please upload the maintenance Excel file")
+    st.stop()
+
+# Read first sheet only
+df = pd.read_excel(uploaded_file)
 df.columns = df.columns.str.strip().str.lower()
 
+# ======================================================
+# HELPER
+# ======================================================
 def has(col):
     return col in df.columns
 
@@ -34,15 +34,15 @@ kpis = []
 kpis.append(("Total Jobs", len(df)))
 
 # ======================================================
-# JOB TYPE KPIs
+# JOB KPIs
 # ======================================================
 if has("job"):
-    job_col = df["job"].astype(str).str.upper()
-    kpis.append(("Breakdown Jobs (B/D)", (job_col == "B/D").sum()))
-    kpis.append(("Corrective Jobs", (job_col == "CORRECTIVE").sum()))
+    job = df["job"].astype(str).str.upper()
+    kpis.append(("Breakdown Jobs (B/D)", (job == "B/D").sum()))
+    kpis.append(("Corrective Jobs", (job == "CORRECTIVE").sum()))
 
 # ======================================================
-# TIME / DOWNTIME KPIs
+# TIME KPIs
 # ======================================================
 time_col = None
 for c in ["time consumed", "maintenance time", "time consumed (minute)"]:
@@ -53,20 +53,20 @@ for c in ["time consumed", "maintenance time", "time consumed (minute)"]:
 
 if time_col:
     kpis.append(("Total Downtime (hrs)", round(df[time_col].sum(), 2)))
-    kpis.append(("MTTR - Avg Repair Time (hrs)", round(df[time_col].mean(), 2)))
+    kpis.append(("MTTR – Avg Repair Time (hrs)", round(df[time_col].mean(), 2)))
 
 # ======================================================
 # MACHINE KPIs
 # ======================================================
 if has("machine no.") and time_col:
-    top_machines = (
+    top = (
         df.groupby("machine no.")[time_col]
         .sum()
         .sort_values(ascending=False)
         .head(5)
     )
 
-    for i, (m, t) in enumerate(top_machines.items(), 1):
+    for i, (m, t) in enumerate(top.items(), 1):
         kpis.append((f"Top {i} Machine Downtime", f"{m} ({round(t,2)} hrs)"))
 
 # ======================================================
@@ -91,11 +91,9 @@ if has("type"):
         kpis.append((f"Jobs Type – {t}", c))
 
 # ======================================================
-# KPI OUTPUT TABLE
+# KPI OUTPUT
 # ======================================================
 kpi_df = pd.DataFrame(kpis, columns=["KPI", "Value"])
 
-# ======================================================
-# OUTPUT (SAFE FOR ALL ENVIRONMENTS)
-# ======================================================
-kpi_df
+st.subheader("✅ KPI Summary")
+st.dataframe(kpi_df, use_container_width=True)
