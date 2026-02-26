@@ -30,14 +30,34 @@ CRATES AREA / LINE – MACHINE HISTORY (Technical Summary)
 """,
 
     "M1": """
-M1 – MACHINE HISTORY (Technical Summary)
+M1 – MACHINE HISTORY
+•	Adjusted capper mechanisms including cap chute, cap dispenser, cap sorter, bottle stopper guide, and overall capper alignment.
+•	Adjusted and fine‑tuned torque settings, torque limiters, and air regulators for stable capping performance.
+•	Aligned capping heads and cap applicator assemblies to correct misalignment and improve cap placement accuracy.
+•	Checked and adjusted filler cylinder rod and product regulating valve to stabilize filling operation.
+•	Rectified capper #1 and #4 issues, including height adjustment of cap dispenser and replacement of capper finger pin.
+•	Repaired and adjusted cap holder assembly; noted finger cam replacement requirement.
+•	Replaced broken filler piston, broken nozzle pin, and defective sensors/cables.
+•	Replaced capper spindle using available spare and fine‑tuned jaw air pressure.
+•	Replaced defective torque limiter and restored proper torque control.
+•	Replaced capper piston assembly and corrected timing after detachment from the mechanism.
+•	Installed new air regulator to stabilize jaw air pressure.
+•	Lubricated capper assembly and performed routine mechanical adjustments.
+•	Fabricated and installed capper bottle guide to correct bottle flow issues.
+•	Repaired overhead conveyor sprocket and reconnected broken overhead conveyor sections.
+•	Removed broken conveyor links, replaced damaged links, and restored conveyor operation.
+•	Removed sliding plate bracket, extracted broken bolt, replaced hardware, and reinstalled assembly.
+•	Reset VLT/VFD drive faults, motor faults, stacker faults, and circuit breaker trips.
+•	Troubleshot auto‑mode failure; found solenoid valves contaminated with water, cleaned and replaced corroded coils.
+•	Troubleshot carriage plate not opening and resolved mechanical obstruction.
+•	Troubleshot automatic operation failure; corrected loose selector switch connection.
+•	Released air lock and restored pneumatic operation.
+•	Repaired stacker system issues and reset crates stacker system fault.
+•	Welded cap applicator lock to eliminate excessive movement and prevent misalignment.
+•	Repaired damaged crates conveyor and restored overhead conveyor alignment.
+•	Rebalanced crates lifter and cleared system fault.
+•	Updated machine message display due to corrupted characters
 
-• Adjusted capper mechanisms including cap chute, cap dispenser, cap sorter, bottle stopper guide.
-• Adjusted torque settings, torque limiters, and air regulators.
-• Aligned capping heads and cap applicator assemblies.
-• Replaced broken filler piston, nozzle pin, and defective sensors.
-• Reset VFD, motor faults, and breaker trips.
-• Released air lock and restored pneumatic operation.
 """,
 
     "M2": """
