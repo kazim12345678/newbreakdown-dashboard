@@ -1,3 +1,5 @@
+import streamlit as st
+
 MACHINE_HISTORY = {
     "CRATES AREA": [
         "Aligned the drive sprocket and corrected conveyor tracking.",
@@ -28,7 +30,7 @@ MACHINE_HISTORY = {
         "Replaced damaged overhead crates conveyor sections and restored full movement.",
         "Performed general welding, fabrication, and mechanical corrections across conveyor assemblies.",
         "Logged condition: one side running manually; replacement sprocket machining required.",
-        "Noted damaged arm bearings for day shift follow‑up."
+        "Noted damaged arm bearings for day shift follow-up."
     ],
     "M1": [
         "Adjusted capper mechanisms including cap chute, cap dispenser, cap sorter, and overall capper alignment.",
@@ -297,3 +299,9 @@ MACHINE_HISTORY = {
         "Noted need to top-up make-up solution; stock unavailable."
     ]
 }
+
+st.sidebar.title("Machine Selector")
+machine = st.sidebar.selectbox("Select a machine:", list(MACHINE_HISTORY.keys()))
+
+st.title(f"Maintenance History for {machine}")
+st.write("\n".join(MACHINE_HISTORY[machine]))
