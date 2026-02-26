@@ -218,9 +218,10 @@ General Maintenance & Restorations
 
     
     """,
-    "M4": """
+    "M5": """
+    no in use
     """,
-    M6": """
+    "M6": """
         M6 – MACHINE HISTORY
 Mechanical Adjustments & Timing Corrections
 •	Adjusted and aligned capper center starwheel, capper heads (#1, #4, #5, #8), and filler exit starwheel.
@@ -273,9 +274,10 @@ General Maintenance & Restorations
 •	Performed lubrication, alignment, and routine mechanical corrections across assemblies.
 
     """,
-    M7": """
+    "M7": """
+    Not in use
     """,
-    M8": """
+    "M8": """
 M8 – MACHINE HISTORY
 Mechanical Adjustments & Bottle Handling
 •	Adjusted bottle guides to correct Arnon bottle quality issues and restored smooth bottle flow.
@@ -332,7 +334,7 @@ General Maintenance & Restorations
 •	Disabled station #17 during milk production; repaired filler piston and reinstalled after production.
 
     """,
-    M9": """
+    "M9": """
 M9 – MACHINE HISTORY
 Sensors, Guides & Alignment
 •	Checked and aligned sensors and guides of stacker #1 to restore proper detection and bottle/crate flow.
@@ -348,13 +350,16 @@ Printing System
 •	Set up two printer units (yellow and black ink) and configured them for production use.
 
     """,
-    M10": """
+    "M10": """
+    Not in use
     """,
-    M11": """
+    "M11": """
+    Not in use
     """,
-    M12": """
+    "M12": """
+    Not in use
     """,
-    M13": """
+    "M13": """
 M13 – MACHINE HISTORY
 •	Adjusted chain pusher alignment, carton alignment, and machine homing position.
 •	Adjusted chain packer alignment and corrected timing issues.
@@ -388,7 +393,7 @@ M13 – MACHINE HISTORY
 •	Noted absence of operator during troubleshooting events.
 
     """,
-    M14": """
+    "M14": """
 M14 – MACHINE HISTORY
 Mechanical Adjustments & Timing Corrections
 •	Adjusted bottle screw timing, bottle guides, intermediate infeed screw, and overall bottle handling alignment.
@@ -446,7 +451,7 @@ Calibration & System Reset
 •	Reset multiple system alarms including servo driver, orientator conveyor, and safety faults.
 
     """,
-    M15": """
+    "M15": """
 M15 – MACHINE HISTORY
 Mechanical Adjustments & Timing Corrections
 •	Adjusted bottle gate #1 and #2, bottle infeed screw, bottle separator belt, and bottle guides.
@@ -506,7 +511,7 @@ General Maintenance & Restorations
 •	Reset full line crates sensor and restored detection accuracy.
 
     """,
-    M16": """
+    "M16": """
     M16 – MACHINE HISTORY
 Mechanical Adjustments & Timing Corrections
 •	Adjusted bottle screw timing and infeed screw timing to correct bottle flow.
@@ -545,7 +550,7 @@ General Maintenance & Restorations
 •	Reset machine faults after mechanical or electrical corrections
 
     """,
-    M17": """
+   "M17": """
 M17 – MACHINE HISTORY
 Mechanical Adjustments & Timing Corrections
 •	Aligned bottle exit starwheel to guide and corrected bottle entry alignment at rinser holders #10 and #25.
@@ -595,7 +600,7 @@ General Maintenance & Restorations
 •	Set machine to zero position and synchronized system after major adjustments
 
     """,
-    M18": """
+    "M18": """
 M18 – MACHINE HISTORY
 Mechanical Adjustments & Timing Corrections
 •	Adjusted timing of infeed bottle screw and bottle screw guide; corrected synchronization issues.
