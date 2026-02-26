@@ -61,21 +61,106 @@ M1 – MACHINE HISTORY
 """,
 
     "M2": """
-M2 – MACHINE HISTORY (Technical Summary)
+M2 HISTORY
+Capper System Adjustments & Timing Corrections
+•	Adjusted alignment of capper assembly, cap applicator, cap chute stopper, and cap dispenser.
+•	Corrected timing of bottle screw, capper heads, cap plate, and cap dispenser.
+•	Fine‑tuned torque pressure, torque limiter settings, and cap grip air pressure for stable capping.
+•	Aligned capper heads, capper plate, spindle #3 & #4, and cap conveyor height to cap chute.
+•	Adjusted capper #2 and #4 torque settings; noted finger cams and capper fingers require replacement (no spare available).
+•	Zeroed encoder position and restored capper carousel alignment.
+Crates, Hopper & Bottle Handling
+•	Adjusted and activated crates hopper sensor; aligned crates stacker lifter on both sides.
+•	Checked and rectified bottle stopper issues and restored proper bottle flow.
+•	Removed clogged plastic bottles from capper area.
+•	Repaired bottle elevator and corrected mechanical alignment.
+Sensors, Electrical & Control System
+•	Checked and adjusted hopper level sensor and packer sensor activation.
+•	Rectified missing signal of crates stopper and repaired micro valve switch.
+•	Replaced defective infeed safety sensor and restored machine stopping logic.
+•	Reset machine faults and restored encoder zero position.
+•	Cleaned printhead and restored print quality.
+Mechanical Repairs & Component Replacement
+•	Repaired capper heads #2, #3, and #4; replaced capper fingers using old spare to correct cross‑capping.
+•	Repaired torque limiter, cap holder assembly, and cap applicator timing.
+•	Repaired packer head and bottle air sprayer.
+•	Repaired detached filler rod pin, cylinder lock for nozzle, and disconnected solenoid valve wiring.
+•	Repaired roller assembly, welded broken parts, and reinstalled.
+•	Repaired detached drive chain of conveyor and rejoined broken conveyor sections.
+•	Rebalanced crates lifter and adjusted lifter stopper.
+Pneumatics & Air System
+•	Repaired air leakage and rectified hopper level sensor issues.
+•	Installed back detached filler air supply.
+•	Increased capper jaw air pressure (capper fingers still require replacement).
+•	Replaced defective cylinder of crates stopper and defective suction head.
+Component Replacement
+•	Replaced damaged lock bolt, cap gripper spring, and torque limiter (due to defective one‑way bearing).
+•	Replaced solenoid valve and tested operation.
+•	Replaced bottle picker and defective micro valve switch.
+•	Replaced damaged lock bolt and retimed assembly.
+•	Replaced defective torque limiter and restored torque control.
+General Maintenance & Restorations
+•	Applied grease on torque limiter gear drive; gear drive requires replacement.
+•	Checked and rectified product level issues.
+•	Checked and repaired cap dispenser due to caps falling.
+•	Performed alignment and timing corrections across capper and filler assemblies.
+•	Completed multiple resets after mechanical or electrical corrections.
+ 
 
-• Adjusted capper assembly alignment and timing.
-• Checked bottle stopper operation and restored bottle flow.
-• Repaired packer head and bottle air sprayer.
-• Reset encoder position and restored capper carousel alignment.
 """,
 
     "M3": """
-M3 – MACHINE HISTORY (Technical Summary)
+M3 – MACHINE HISTORY
+Mechanical Adjustments & Timing Corrections
+•	Adjusted conveyor belt alignment and tension, including bottle cable conveyor tensioning.
+•	Adjusted divider sensor activation and corrected general sensor alignment.
+•	Adjusted timing of starwheel #5 and retimed outfeed starwheel.
+•	Aligned bottle sensor, drive sprocket, and capper starwheel.
+•	Corrected bottle stopper alignment and restored proper bottle flow.
+Capper, Filler & Bottle Handling Systems
+•	Identified finger cam wear; replacement required but no spare available.
+•	Repaired cap holder assembly and corrected cap holder finger issues.
+•	Repaired packer bottle stopper and C‑loop pusher.
+•	Repaired filler #3 and #8 assemblies and corrected mechanical alignment.
+•	Repaired bottle air sprayer and restored proper operation.
+Sensors, Electrical & Control System
+•	Replaced damaged sensor cables, defective sensors, and faulty stacker door switch.
+•	Replaced magnetic contactor and restored electrical continuity.
+•	Reset stacker faults, breaker trips, and system alarms.
+•	Repaired shorted motor cable and restored safe operation.
+•	Installed back detached crates pusher and replaced busted sensor.
+•	Repaired solenoid valve wiring and lubricated solenoid valves.
+•	Troubleshot filling station communication issues; cleaned carbon brushes, checked communication cables, replaced TES net card, downloaded program, and tested.
+•	Reinstalled detached carbon brushes and collector assembly.
+Conveyor, Crates & Material Handling
+•	Repaired damaged conveyor sections and packer crates conveyor.
+•	Removed damaged conveyor links and reconnected conveyor.
+•	Installed back detached roller bracket and corrected outfeed conveyor derailment.
+•	Repaired crates lifter plate and restored lifting function.
+•	Reconnected packer crates conveyor after mechanical failure.
+Pneumatics & Air System
+•	Fixed multiple air leakages and replaced damaged hose fittings for stopper cylinder.
+•	Repaired detached cylinder end of carriage and restored pneumatic actuation.
+•	Lubricated solenoid valves for bottle stopper and restored smooth operation.
+Structural, Fabrication & Welding
+•	Removed carriage plate, welded broken parts in workshop, and reinstalled.
+•	Modified pulley side plate to allow proper tension adjustment.
+•	Welded and repaired roller housing; replaced free‑wheel gear and aligned assembly.
+Component Replacement
+•	Replaced cut stacker left‑side lifting belt.
+•	Replaced defective crates gate sensor and sensor cable assemblies.
+•	Replaced worn‑out capper piston spring.
+•	Replaced torque limiter and restored torque control.
+•	Replaced solenoid valve using available spare.
+•	Replaced printer with spare unit from M9 due to pressure fault.
+General Maintenance & Restorations
+•	Cleaned carbon brushes and adjusted brush length.
+•	Cleaned printhead and restored print quality.
+•	Fixed detached drive chain of conveyor and restored operation.
+•	Performed routine lubrication and mechanical adjustments across assemblies.
+•	Reset faults after mechanical or electrical corrections.
+ 
 
-• Adjusted conveyor belt alignment and tension.
-• Repaired cap holder assembly and corrected cap holder finger issues.
-• Replaced damaged sensor cables and magnetic contactor.
-• Reset stacker faults and system alarms.
 """,
 
     # ⛔ CONTINUE SAME WAY ⛔
