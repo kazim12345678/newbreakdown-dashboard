@@ -162,6 +162,62 @@ General Maintenance & Restorations
  
 
 """,
+    "M4": """
+    M4 – MACHINE HISTORY
+Mechanical Adjustments & Timing Corrections
+•	Adjusted and increased crates lifter sledge opening; balanced crates lifter height and fabricated new sledge stopper.
+•	Adjusted starwheel timing and corrected timing drift across bottle handling sections.
+•	Adjusted filler cylinder shaft to prevent product leakage.
+•	Adjusted capper torque pressure and torque settings for capper #2 and #3.
+•	Zeroed encoder position multiple times after timing issues and reset stacker faults.
+Crates, Pusher & Material Handling
+•	Checked and adjusted crates pusher cylinder rod end; replaced broken crates position sensor.
+•	Repaired crates pusher assembly and corrected alignment.
+•	Fixed detached crates C‑loop pusher cylinder rod end.
+•	Regulated crates pusher air cushioner for smoother operation.
+•	Repositioned upper crates lifter limit switch and cleared system fault.
+•	Rebalanced crates lifter and reset alarms.
+Capper, Filler & Bottle Handling Systems
+•	Repaired capper head #3; replaced gripper bolts and tightened gripper screws for heads #3, #4, and #6.
+•	Repaired cap applicator and cap picker alignment.
+•	Replaced damaged cap dispenser bolt and corrected dispenser alignment.
+•	Replaced defective spindle and torque limiter (using old spare).
+•	Identified torque limiter requiring replacement; temporary adjustments applied.
+•	Fixed loose cap gripper and lubricated assembly.
+Sensors, Electrical & Control System
+•	Checked and rectified divider limit sensor and divider unit sensor.
+•	Cleaned and serviced divider servo motor drive; reset servo faults.
+•	Cleaned servo driver, reinstalled, and performed manual homing.
+•	Repaired encoder coupling and replaced broken encoder coupling.
+•	Reset faulty drive, inverter faults, VLT faults, and stacker PLC faults.
+•	Troubleshot missing crates lifter signal and corrected encoder coupling.
+•	Replaced defective bottle counter sensor and divider homing sensor.
+•	Installed new photo sensor and restored detection accuracy.
+•	Repaired shorted sensor cable for bottle counter and replaced with new cable.
+Conveyor, Gear & Mechanical Repairs
+•	Aligned drive sprocket and corrected conveyor belt alignment.
+•	Fixed damaged conveyor sections and packer crates conveyor.
+•	Removed damaged conveyor links and reconnected conveyor.
+•	Repaired labeller servo drive sprocket and loose drive gear.
+•	Repaired servo motor drive pulley and restored proper rotation.
+•	Removed carriage plate, welded broken parts, and reinstalled.
+•	Repaired broken water pipe and replaced damaged filler belt.
+Pneumatics & Air System
+•	Fixed multiple air leakages and replaced damaged air hoses.
+•	Installed air control valve for unitizer crates pusher.
+•	Lubricated solenoid valves and spray ball valve; verified spray ball operation.
+•	Repaired pusher cylinder and welded crates platform.
+General Maintenance & Restorations
+•	Cleaned servo drives, removed excess ink, and restored print quality.
+•	Checked and opened product valve; verified normal operation.
+•	Tightened capper jaw screws and cap gripper bolts.
+•	Repaired coupling of encoder due to lack of spare; temporary fix applied.
+•	Performed system resets after mechanical or electrical corrections.
+•	Continued work on drive gear assembly, secured wiring, added gear oil, and tested.
+ 
+
+    
+    """,
 
     # ⛔ CONTINUE SAME WAY ⛔
     # COPY EACH MACHINE HISTORY FROM YOUR CURRENT SHEET
