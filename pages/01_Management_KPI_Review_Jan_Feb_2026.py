@@ -1,272 +1,173 @@
-# ===============================================================
-# ENTERPRISE MANAGEMENT DOWNTIME DASHBOARD
-# January – February 2026
-# Covers 12 KPIs + MTTR + MTBF + Availability + Advanced Graphs
-# ===============================================================
+# ============================================================
+# KPI #2 – NOTIFICATION PERFORMANCE ANALYTICS
+# ============================================================
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
+st.subheader("📢 KPI #2 – Notification Compliance Dashboard")
 
-st.set_page_config(layout="wide")
+# ------------------------------------------------------------
+# PREPARE NOTIFICATION DATA
+# ------------------------------------------------------------
 
-st.title("📊 Executive Downtime & Reliability Dashboard")
-st.markdown("### Operational Performance Review – Jan & Feb 2026")
-st.markdown("---")
+notif_df = df.copy()
 
-# ===============================================================
-# LOAD DATA
-# ===============================================================
+notif_summary = (
+    notif_df
+    .groupby(["Date_Clean", "Notification_Status"])
+    .size()
+    .unstack(fill_value=0)
+    .reset_index()
+)
 
-df = pd.read_csv("data/cleaned_downtime_data.csv")
-df["Date_Clean"] = pd.to_datetime(df["Date_Clean"])
+# Ensure both columns exist
+if "With Notification" not in notif_summary.columns:
+    notif_summary["With Notification"] = 0
+if "Without Notification" not in notif_summary.columns:
+    notif_summary["Without Notification"] = 0
 
-# ===============================================================
-# BASIC CALCULATIONS
-# ===============================================================
+notif_summary["Total_Jobs"] = (
+    notif_summary["With Notification"] +
+    notif_summary["Without Notification"]
+)
 
-TOTAL_DAYS = df["Date_Clean"].nunique()
-TOTAL_MACHINES = df["Machine"].nunique()
-TOTAL_DOWNTIME = df["Consumed_Hours"].sum()
-
-DAILY_DOWNTIME = df.groupby("Date_Clean")["Consumed_Hours"].sum().reset_index()
-MACHINE_DOWNTIME = df.groupby("Machine")["Consumed_Hours"].sum().reset_index()
-
-AVERAGE_DAILY_DOWNTIME = TOTAL_DOWNTIME / TOTAL_DAYS
-
-AVAILABLE_HOURS = TOTAL_DAYS * 24 * TOTAL_MACHINES
-AVAILABILITY_PERCENT = (1 - (TOTAL_DOWNTIME / AVAILABLE_HOURS)) * 100
-
-ZERO_DOWNTIME_DAYS = DAILY_DOWNTIME[DAILY_DOWNTIME["Consumed_Hours"] == 0].shape[0]
-PEAK_DAY = DAILY_DOWNTIME.loc[DAILY_DOWNTIME["Consumed_Hours"].idxmax()]
-DOWNTIME_STD = DAILY_DOWNTIME["Consumed_Hours"].std()
-
-# ===============================================================
-# MTTR & MTBF
-# ===============================================================
-
-FAILURE_COUNT = df.shape[0]
-MTTR = TOTAL_DOWNTIME / FAILURE_COUNT
-TOTAL_OPERATING_TIME = AVAILABLE_HOURS - TOTAL_DOWNTIME
-MTBF = TOTAL_OPERATING_TIME / FAILURE_COUNT
-
-# ===============================================================
-# MACHINE CONTRIBUTION %
-# ===============================================================
-
-MACHINE_DOWNTIME["Contribution_%"] = (
-    MACHINE_DOWNTIME["Consumed_Hours"] / TOTAL_DOWNTIME
+notif_summary["Compliance_%"] = (
+    notif_summary["With Notification"] /
+    notif_summary["Total_Jobs"]
 ) * 100
 
-TOP5 = MACHINE_DOWNTIME.sort_values(
-    by="Consumed_Hours", ascending=False
-).head(5)
+# ------------------------------------------------------------
+# GLOBAL METRICS
+# ------------------------------------------------------------
 
-# ===============================================================
-# EXECUTIVE KPI CARDS
-# ===============================================================
+TOTAL_JOBS = notif_summary["Total_Jobs"].sum()
+TOTAL_WITH = notif_summary["With Notification"].sum()
+TOTAL_WITHOUT = notif_summary["Without Notification"].sum()
 
-st.subheader("🔎 Executive KPI Overview")
+OVERALL_COMPLIANCE = (TOTAL_WITH / TOTAL_JOBS) * 100
+OVERALL_NON_COMPLIANCE = (TOTAL_WITHOUT / TOTAL_JOBS) * 100
 
-row1 = st.columns(4)
-row1[0].metric("Total Downtime (hrs)", round(TOTAL_DOWNTIME, 2))
-row1[1].metric("Avg Daily Downtime (hrs)", round(AVERAGE_DAILY_DOWNTIME, 2))
-row1[2].metric("Availability (%)", round(AVAILABILITY_PERCENT, 2))
-row1[3].metric("Zero Downtime Days", ZERO_DOWNTIME_DAYS)
+BEST_DAY = notif_summary.loc[notif_summary["Compliance_%"].idxmax()]
+WORST_DAY = notif_summary.loc[notif_summary["Compliance_%"].idxmin()]
 
-row2 = st.columns(4)
-row2[0].metric("Peak Downtime Day", PEAK_DAY["Date_Clean"].date())
-row2[1].metric("Peak Downtime (hrs)", round(PEAK_DAY["Consumed_Hours"], 2))
-row2[2].metric("MTTR (hrs)", round(MTTR, 2))
-row2[3].metric("MTBF (hrs)", round(MTBF, 2))
+COMPLIANCE_STD = notif_summary["Compliance_%"].std()
+
+# ------------------------------------------------------------
+# EXECUTIVE METRIC CARDS
+# ------------------------------------------------------------
+
+col1, col2, col3, col4 = st.columns(4)
+
+col1.metric("Total Jobs", int(TOTAL_JOBS))
+col2.metric("With Notification %", f"{OVERALL_COMPLIANCE:.1f}%")
+col3.metric("Without Notification %", f"{OVERALL_NON_COMPLIANCE:.1f}%")
+col4.metric("Compliance Stability (Std Dev)", f"{COMPLIANCE_STD:.2f}")
+
+col5, col6 = st.columns(2)
+
+col5.metric(
+    "Best Compliance Day",
+    BEST_DAY["Date_Clean"].date(),
+    f"{BEST_DAY['Compliance_%']:.1f}%"
+)
+
+col6.metric(
+    "Worst Compliance Day",
+    WORST_DAY["Date_Clean"].date(),
+    f"{WORST_DAY['Compliance_%']:.1f}%"
+)
 
 st.markdown("---")
 
-# ===============================================================
-# KPI 1 – Daily Downtime Trend
-# ===============================================================
+# ------------------------------------------------------------
+# BEAUTIFUL STACKED BAR – DAILY BREAKDOWN
+# ------------------------------------------------------------
 
-st.subheader("📈 Daily Downtime Trend")
-
-fig_trend = px.line(
-    DAILY_DOWNTIME,
+fig1 = px.bar(
+    notif_summary,
     x="Date_Clean",
-    y="Consumed_Hours",
+    y=["With Notification", "Without Notification"],
+    title="Daily Jobs – With vs Without Notification",
+    barmode="stack",
+    template="plotly_dark"
+)
+
+fig1.update_layout(
+    xaxis_title="Date",
+    yaxis_title="Number of Jobs",
+    legend_title="Notification Status",
+    height=500
+)
+
+st.plotly_chart(fig1, use_container_width=True)
+
+# ------------------------------------------------------------
+# COMPLIANCE TREND LINE
+# ------------------------------------------------------------
+
+fig2 = px.line(
+    notif_summary,
+    x="Date_Clean",
+    y="Compliance_%",
     markers=True,
-    template="plotly_white"
+    title="Daily Notification Compliance %",
+    template="plotly_dark"
 )
-fig_trend.update_traces(line=dict(width=4))
-st.plotly_chart(fig_trend, use_container_width=True)
 
-# ===============================================================
-# KPI 2 – Machine-wise Downtime
-# ===============================================================
-
-st.subheader("🏭 Machine-wise Total Downtime")
-
-fig_machine = px.bar(
-    MACHINE_DOWNTIME.sort_values(by="Consumed_Hours", ascending=False),
-    x="Machine",
-    y="Consumed_Hours",
-    template="plotly_white",
-    text_auto=True
+fig2.update_layout(
+    yaxis=dict(range=[0, 100]),
+    height=450
 )
-st.plotly_chart(fig_machine, use_container_width=True)
 
-# ===============================================================
-# KPI 3 – Contribution %
-# ===============================================================
+st.plotly_chart(fig2, use_container_width=True)
 
-st.subheader("📊 Machine Contribution %")
+# ------------------------------------------------------------
+# 7-DAY ROLLING TREND
+# ------------------------------------------------------------
 
-fig_pie = px.pie(
-    MACHINE_DOWNTIME,
-    names="Machine",
-    values="Consumed_Hours",
+notif_summary["Rolling_7Day_Compliance"] = (
+    notif_summary["Compliance_%"]
+    .rolling(7)
+    .mean()
+)
+
+fig3 = px.line(
+    notif_summary,
+    x="Date_Clean",
+    y="Rolling_7Day_Compliance",
+    title="7-Day Rolling Compliance Trend",
+    template="plotly_dark"
+)
+
+fig3.update_layout(
+    yaxis=dict(range=[0, 100]),
+    height=450
+)
+
+st.plotly_chart(fig3, use_container_width=True)
+
+# ------------------------------------------------------------
+# PIE CHART – OVERALL DISTRIBUTION
+# ------------------------------------------------------------
+
+fig4 = px.pie(
+    values=[TOTAL_WITH, TOTAL_WITHOUT],
+    names=["With Notification", "Without Notification"],
+    title="Overall Notification Distribution",
+    template="plotly_dark",
     hole=0.5
 )
-st.plotly_chart(fig_pie, use_container_width=True)
 
-# ===============================================================
-# KPI 4 – Top 5 Critical Machines
-# ===============================================================
+st.plotly_chart(fig4, use_container_width=True)
 
-st.subheader("🚨 Top 5 Critical Machines")
+# ------------------------------------------------------------
+# BEAUTIFUL EXECUTIVE TABLE
+# ------------------------------------------------------------
 
-fig_top5 = px.bar(
-    TOP5,
-    x="Machine",
-    y="Consumed_Hours",
-    color="Consumed_Hours",
-    template="plotly_white",
-    text_auto=True
-)
-st.plotly_chart(fig_top5, use_container_width=True)
+styled_table = notif_summary.style \
+    .background_gradient(subset=["Compliance_%"], cmap="YlGn") \
+    .format({
+        "Compliance_%": "{:.1f}%",
+        "Rolling_7Day_Compliance": "{:.1f}%"
+    })
 
-# ===============================================================
-# KPI 5 – Downtime Variability
-# ===============================================================
-
-st.subheader("📉 Downtime Stability Analysis")
-
-fig_box = px.box(
-    DAILY_DOWNTIME,
-    y="Consumed_Hours",
-    template="plotly_white"
-)
-st.plotly_chart(fig_box, use_container_width=True)
-
-# ===============================================================
-# KPI 6 – Heatmap (Date vs Machine)
-# ===============================================================
-
-st.subheader("🔥 Downtime Heatmap")
-
-pivot = df.pivot_table(
-    index="Date_Clean",
-    columns="Machine",
-    values="Consumed_Hours",
-    aggfunc="sum",
-    fill_value=0
-)
-
-fig_heat = px.imshow(
-    pivot,
-    aspect="auto",
-    color_continuous_scale="Reds"
-)
-st.plotly_chart(fig_heat, use_container_width=True)
-
-# ===============================================================
-# KPI 7 – Availability Gauge
-# ===============================================================
-
-st.subheader("⚙ Plant Availability")
-
-fig_gauge = go.Figure(go.Indicator(
-    mode="gauge+number",
-    value=AVAILABILITY_PERCENT,
-    gauge={'axis': {'range': [0, 100]}}
-))
-st.plotly_chart(fig_gauge, use_container_width=True)
-
-# ===============================================================
-# KPI 8 – Reliability Summary Table
-# ===============================================================
-
-st.subheader("📋 Machine Downtime Table")
-
-st.dataframe(
-    MACHINE_DOWNTIME.sort_values(
-        by="Consumed_Hours", ascending=False
-    ),
-    use_container_width=True
-)
-
-# ===============================================================
-# KPI 9 – Distribution Histogram
-# ===============================================================
-
-st.subheader("📊 Downtime Distribution")
-
-fig_hist = px.histogram(
-    DAILY_DOWNTIME,
-    x="Consumed_Hours",
-    nbins=20,
-    template="plotly_white"
-)
-st.plotly_chart(fig_hist, use_container_width=True)
-
-# ===============================================================
-# KPI 10 – Cumulative Downtime Curve
-# ===============================================================
-
-st.subheader("📈 Cumulative Downtime")
-
-DAILY_DOWNTIME["Cumulative"] = DAILY_DOWNTIME["Consumed_Hours"].cumsum()
-
-fig_cum = px.area(
-    DAILY_DOWNTIME,
-    x="Date_Clean",
-    y="Cumulative",
-    template="plotly_white"
-)
-st.plotly_chart(fig_cum, use_container_width=True)
-
-# ===============================================================
-# KPI 11 – Operating vs Downtime
-# ===============================================================
-
-st.subheader("⚖ Operating vs Downtime Comparison")
-
-fig_compare = go.Figure()
-fig_compare.add_bar(
-    x=["Operating Time"],
-    y=[TOTAL_OPERATING_TIME]
-)
-fig_compare.add_bar(
-    x=["Downtime"],
-    y=[TOTAL_DOWNTIME]
-)
-st.plotly_chart(fig_compare, use_container_width=True)
-
-# ===============================================================
-# KPI 12 – Executive Insights
-# ===============================================================
-
-st.subheader("🧠 Executive Insights")
-
-st.markdown(f"""
-- Total Downtime Recorded: **{round(TOTAL_DOWNTIME,2)} hrs**
-- Average Daily Downtime: **{round(AVERAGE_DAILY_DOWNTIME,2)} hrs**
-- Plant Availability: **{round(AVAILABILITY_PERCENT,2)}%**
-- Most Critical Machine: **{TOP5.iloc[0]['Machine']}**
-- MTTR: **{round(MTTR,2)} hrs**
-- MTBF: **{round(MTBF,2)} hrs**
-- Downtime Variability (Std Dev): **{round(DOWNTIME_STD,2)}**
-""")
-
-st.markdown("---")
-st.markdown("### ✅ Dashboard Ready for Management Review & PDF Export")
+st.markdown("### 📋 Detailed Daily Notification Table")
+st.dataframe(styled_table, use_container_width=True)
