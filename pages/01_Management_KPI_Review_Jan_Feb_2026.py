@@ -1,225 +1,272 @@
+# ===============================================================
+# ENTERPRISE MANAGEMENT DOWNTIME DASHBOARD
+# January – February 2026
+# Covers 12 KPIs + MTTR + MTBF + Availability + Advanced Graphs
+# ===============================================================
+
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
 
 st.set_page_config(layout="wide")
 
-st.title("📊 Maintenance KPI Review – January & February 2026")
-st.markdown("### Executive Management Dashboard")
+st.title("📊 Executive Downtime & Reliability Dashboard")
+st.markdown("### Operational Performance Review – Jan & Feb 2026")
 st.markdown("---")
 
-# =========================
-# KPI 1 – Total Downtime
-# =========================
+# ===============================================================
+# LOAD DATA
+# ===============================================================
 
-st.header("1️⃣ Date-wise Machine Total Downtime")
+df = pd.read_csv("data/cleaned_downtime_data.csv")
+df["Date_Clean"] = pd.to_datetime(df["Date_Clean"])
 
-total_downtime = 452.78
+# ===============================================================
+# BASIC CALCULATIONS
+# ===============================================================
 
-col1, col2, col3 = st.columns(3)
-col1.metric("Total Downtime (hrs)", total_downtime)
-col2.metric("Total Jobs", 1125)
-col3.metric("Total Waiting Hours", 68.80)
+TOTAL_DAYS = df["Date_Clean"].nunique()
+TOTAL_MACHINES = df["Machine"].nunique()
+TOTAL_DOWNTIME = df["Consumed_Hours"].sum()
+
+DAILY_DOWNTIME = df.groupby("Date_Clean")["Consumed_Hours"].sum().reset_index()
+MACHINE_DOWNTIME = df.groupby("Machine")["Consumed_Hours"].sum().reset_index()
+
+AVERAGE_DAILY_DOWNTIME = TOTAL_DOWNTIME / TOTAL_DAYS
+
+AVAILABLE_HOURS = TOTAL_DAYS * 24 * TOTAL_MACHINES
+AVAILABILITY_PERCENT = (1 - (TOTAL_DOWNTIME / AVAILABLE_HOURS)) * 100
+
+ZERO_DOWNTIME_DAYS = DAILY_DOWNTIME[DAILY_DOWNTIME["Consumed_Hours"] == 0].shape[0]
+PEAK_DAY = DAILY_DOWNTIME.loc[DAILY_DOWNTIME["Consumed_Hours"].idxmax()]
+DOWNTIME_STD = DAILY_DOWNTIME["Consumed_Hours"].std()
+
+# ===============================================================
+# MTTR & MTBF
+# ===============================================================
+
+FAILURE_COUNT = df.shape[0]
+MTTR = TOTAL_DOWNTIME / FAILURE_COUNT
+TOTAL_OPERATING_TIME = AVAILABLE_HOURS - TOTAL_DOWNTIME
+MTBF = TOTAL_OPERATING_TIME / FAILURE_COUNT
+
+# ===============================================================
+# MACHINE CONTRIBUTION %
+# ===============================================================
+
+MACHINE_DOWNTIME["Contribution_%"] = (
+    MACHINE_DOWNTIME["Consumed_Hours"] / TOTAL_DOWNTIME
+) * 100
+
+TOP5 = MACHINE_DOWNTIME.sort_values(
+    by="Consumed_Hours", ascending=False
+).head(5)
+
+# ===============================================================
+# EXECUTIVE KPI CARDS
+# ===============================================================
+
+st.subheader("🔎 Executive KPI Overview")
+
+row1 = st.columns(4)
+row1[0].metric("Total Downtime (hrs)", round(TOTAL_DOWNTIME, 2))
+row1[1].metric("Avg Daily Downtime (hrs)", round(AVERAGE_DAILY_DOWNTIME, 2))
+row1[2].metric("Availability (%)", round(AVAILABILITY_PERCENT, 2))
+row1[3].metric("Zero Downtime Days", ZERO_DOWNTIME_DAYS)
+
+row2 = st.columns(4)
+row2[0].metric("Peak Downtime Day", PEAK_DAY["Date_Clean"].date())
+row2[1].metric("Peak Downtime (hrs)", round(PEAK_DAY["Consumed_Hours"], 2))
+row2[2].metric("MTTR (hrs)", round(MTTR, 2))
+row2[3].metric("MTBF (hrs)", round(MTBF, 2))
 
 st.markdown("---")
 
-# =========================
-# KPI 2 – Notification
-# =========================
+# ===============================================================
+# KPI 1 – Daily Downtime Trend
+# ===============================================================
 
-st.header("2️⃣ Notification Compliance")
+st.subheader("📈 Daily Downtime Trend")
 
-notification_data = pd.DataFrame({
-    "Status": ["With Notification", "Without Notification"],
-    "Count": [858, 267]
-})
-
-fig_notif = px.pie(
-    notification_data,
-    names="Status",
-    values="Count",
-    hole=0.5,
-    color_discrete_sequence=["#00CC96", "#EF553B"]
+fig_trend = px.line(
+    DAILY_DOWNTIME,
+    x="Date_Clean",
+    y="Consumed_Hours",
+    markers=True,
+    template="plotly_white"
 )
+fig_trend.update_traces(line=dict(width=4))
+st.plotly_chart(fig_trend, use_container_width=True)
 
-st.plotly_chart(fig_notif, use_container_width=True)
+# ===============================================================
+# KPI 2 – Machine-wise Downtime
+# ===============================================================
 
-# =========================
-# KPI 3 – Shift Downtime
-# =========================
+st.subheader("🏭 Machine-wise Total Downtime")
 
-st.header("3️⃣ Shift-wise Downtime")
-
-shift_data = pd.DataFrame({
-    "Shift": ["Day", "Night"],
-    "Downtime": [215.03, 237.75]
-})
-
-fig_shift = px.bar(
-    shift_data,
-    x="Shift",
-    y="Downtime",
-    color="Shift",
-    text_auto=True,
-    color_discrete_sequence=["#636EFA", "#AB63FA"]
-)
-
-st.plotly_chart(fig_shift, use_container_width=True)
-
-# =========================
-# KPI 4 – Job Category
-# =========================
-
-st.header("4️⃣ Breakdown vs Corrective")
-
-job_data = pd.DataFrame({
-    "Category": ["Breakdown", "Corrective"],
-    "Jobs": [454, 671],
-    "Downtime": [248.93, 203.85]
-})
-
-fig_job = px.bar(
-    job_data,
-    x="Category",
-    y="Downtime",
-    color="Category",
-    text_auto=True,
-    color_discrete_sequence=["#EF553B", "#00CC96"]
-)
-
-st.plotly_chart(fig_job, use_container_width=True)
-
-# =========================
-# KPI 5 – Waiting Time
-# =========================
-
-st.header("5️⃣ Total Waiting Time Impact")
-
-waiting_percentage = round((68.80 / 452.78) * 100, 2)
-
-col1, col2 = st.columns(2)
-col1.metric("Total Waiting (hrs)", 68.80)
-col2.metric("Waiting Impact %", f"{waiting_percentage} %")
-
-# =========================
-# KPI 6 – MTTR & MTBF
-# =========================
-
-st.header("6️⃣ Reliability KPIs")
-
-col1, col2 = st.columns(2)
-col1.metric("Overall MTTR (hrs)", 0.55)
-col2.metric("Overall MTBF (hrs)", 68.72)
-
-# =========================
-# KPI 7 – Hourly Downtime Pattern
-# =========================
-
-st.header("7️⃣ Hourly Downtime Pattern")
-
-hourly_data = pd.DataFrame({
-    "Hour": list(range(24)),
-    "Downtime": [
-        18.30,27.43,20.87,19.27,19.17,3.35,15.35,37.42,
-        19.07,14.47,16.92,4.13,15.00,20.78,22.77,27.83,
-        13.38,8.62,30.53,4.88,24.20,23.90,24.88,20.27
-    ]
-})
-
-fig_hour = px.line(
-    hourly_data,
-    x="Hour",
-    y="Downtime",
-    markers=True
-)
-
-st.plotly_chart(fig_hour, use_container_width=True)
-
-# =========================
-# KPI 8 – Technician Performance
-# =========================
-
-st.header("8️⃣ Technician Performance Overview")
-
-tech_data = pd.DataFrame({
-    "Technician": ["Dante","Nashwan","Husam","Day Shift Maint. Team","Edgar"],
-    "Total Hours": [94.62,85.37,84.63,66.52,56.77],
-    "Total Jobs": [239,235,226,157,154]
-})
-
-fig_tech = px.bar(
-    tech_data,
-    x="Technician",
-    y="Total Hours",
-    color="Total Jobs",
+fig_machine = px.bar(
+    MACHINE_DOWNTIME.sort_values(by="Consumed_Hours", ascending=False),
+    x="Machine",
+    y="Consumed_Hours",
+    template="plotly_white",
     text_auto=True
 )
+st.plotly_chart(fig_machine, use_container_width=True)
 
-st.plotly_chart(fig_tech, use_container_width=True)
+# ===============================================================
+# KPI 3 – Contribution %
+# ===============================================================
 
-# =========================
-# KPI 9 – Technician Job Distribution
-# =========================
+st.subheader("📊 Machine Contribution %")
 
-st.subheader("Technician Breakdown vs Corrective Distribution")
+fig_pie = px.pie(
+    MACHINE_DOWNTIME,
+    names="Machine",
+    values="Consumed_Hours",
+    hole=0.5
+)
+st.plotly_chart(fig_pie, use_container_width=True)
 
-tech_split = pd.DataFrame({
-    "Category": ["Breakdown","Corrective"],
-    "Hours": [456.88, 367.87]
-})
+# ===============================================================
+# KPI 4 – Top 5 Critical Machines
+# ===============================================================
 
-fig_split = px.pie(
-    tech_split,
-    names="Category",
-    values="Hours",
-    hole=0.4
+st.subheader("🚨 Top 5 Critical Machines")
+
+fig_top5 = px.bar(
+    TOP5,
+    x="Machine",
+    y="Consumed_Hours",
+    color="Consumed_Hours",
+    template="plotly_white",
+    text_auto=True
+)
+st.plotly_chart(fig_top5, use_container_width=True)
+
+# ===============================================================
+# KPI 5 – Downtime Variability
+# ===============================================================
+
+st.subheader("📉 Downtime Stability Analysis")
+
+fig_box = px.box(
+    DAILY_DOWNTIME,
+    y="Consumed_Hours",
+    template="plotly_white"
+)
+st.plotly_chart(fig_box, use_container_width=True)
+
+# ===============================================================
+# KPI 6 – Heatmap (Date vs Machine)
+# ===============================================================
+
+st.subheader("🔥 Downtime Heatmap")
+
+pivot = df.pivot_table(
+    index="Date_Clean",
+    columns="Machine",
+    values="Consumed_Hours",
+    aggfunc="sum",
+    fill_value=0
 )
 
-st.plotly_chart(fig_split, use_container_width=True)
+fig_heat = px.imshow(
+    pivot,
+    aspect="auto",
+    color_continuous_scale="Reds"
+)
+st.plotly_chart(fig_heat, use_container_width=True)
 
-# =========================
-# KPI 10 – Top Breakdown Reasons
-# =========================
+# ===============================================================
+# KPI 7 – Availability Gauge
+# ===============================================================
 
-st.header("🔟 Top 10 Breakdown Reasons")
+st.subheader("⚙ Plant Availability")
 
-st.info("Top 10 breakdown reasons by downtime hours (From KPI#10 dataset)")
+fig_gauge = go.Figure(go.Indicator(
+    mode="gauge+number",
+    value=AVAILABILITY_PERCENT,
+    gauge={'axis': {'range': [0, 100]}}
+))
+st.plotly_chart(fig_gauge, use_container_width=True)
 
-# Placeholder – connect your real dataset later
-reason_data = pd.DataFrame({
-    "Reason": ["Mechanical Jam","Sensor Failure","Air Pressure","Motor Fault","Capper Issue"],
-    "Downtime": [45,38,32,28,25]
-})
+# ===============================================================
+# KPI 8 – Reliability Summary Table
+# ===============================================================
 
-fig_reason = px.bar(
-    reason_data,
-    x="Downtime",
-    y="Reason",
-    orientation="h",
-    text_auto=True,
-    color="Downtime"
+st.subheader("📋 Machine Downtime Table")
+
+st.dataframe(
+    MACHINE_DOWNTIME.sort_values(
+        by="Consumed_Hours", ascending=False
+    ),
+    use_container_width=True
 )
 
-st.plotly_chart(fig_reason, use_container_width=True)
+# ===============================================================
+# KPI 9 – Distribution Histogram
+# ===============================================================
 
-# =========================
-# Executive Summary
-# =========================
+st.subheader("📊 Downtime Distribution")
 
-st.markdown("---")
-st.header("📌 Executive Summary – Jan & Feb 2026")
+fig_hist = px.histogram(
+    DAILY_DOWNTIME,
+    x="Consumed_Hours",
+    nbins=20,
+    template="plotly_white"
+)
+st.plotly_chart(fig_hist, use_container_width=True)
 
-st.success("""
-• Total Downtime: 452.78 hrs  
-• Breakdown Ratio: 40% (Reactive Maintenance still high)  
-• Night Shift higher downtime than Day  
-• Waiting Loss Impact: ~15%  
-• Peak Risk Hours: 7 AM & 6 PM  
-• Top Contributors: Dante, Nashwan, Husam  
-• Notification Compliance: 76%  
+# ===============================================================
+# KPI 10 – Cumulative Downtime Curve
+# ===============================================================
+
+st.subheader("📈 Cumulative Downtime")
+
+DAILY_DOWNTIME["Cumulative"] = DAILY_DOWNTIME["Consumed_Hours"].cumsum()
+
+fig_cum = px.area(
+    DAILY_DOWNTIME,
+    x="Date_Clean",
+    y="Cumulative",
+    template="plotly_white"
+)
+st.plotly_chart(fig_cum, use_container_width=True)
+
+# ===============================================================
+# KPI 11 – Operating vs Downtime
+# ===============================================================
+
+st.subheader("⚖ Operating vs Downtime Comparison")
+
+fig_compare = go.Figure()
+fig_compare.add_bar(
+    x=["Operating Time"],
+    y=[TOTAL_OPERATING_TIME]
+)
+fig_compare.add_bar(
+    x=["Downtime"],
+    y=[TOTAL_DOWNTIME]
+)
+st.plotly_chart(fig_compare, use_container_width=True)
+
+# ===============================================================
+# KPI 12 – Executive Insights
+# ===============================================================
+
+st.subheader("🧠 Executive Insights")
+
+st.markdown(f"""
+- Total Downtime Recorded: **{round(TOTAL_DOWNTIME,2)} hrs**
+- Average Daily Downtime: **{round(AVERAGE_DAILY_DOWNTIME,2)} hrs**
+- Plant Availability: **{round(AVAILABILITY_PERCENT,2)}%**
+- Most Critical Machine: **{TOP5.iloc[0]['Machine']}**
+- MTTR: **{round(MTTR,2)} hrs**
+- MTBF: **{round(MTBF,2)} hrs**
+- Downtime Variability (Std Dev): **{round(DOWNTIME_STD,2)}**
 """)
 
 st.markdown("---")
-st.markdown("Prepared for Management Review – 2026")
+st.markdown("### ✅ Dashboard Ready for Management Review & PDF Export")
