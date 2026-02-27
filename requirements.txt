@@ -63,3 +63,9 @@ numpy
 plotly
 openpyxl
 xlsxwriter
+streamlit
+pandas
+numpy
+openpyxl
+matplotlib
+seaborn
