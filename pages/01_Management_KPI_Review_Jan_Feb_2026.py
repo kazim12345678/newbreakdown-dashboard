@@ -1,173 +1,212 @@
 # ============================================================
-# KPI #2 – NOTIFICATION PERFORMANCE ANALYTICS
+# MANAGEMENT KPI DASHBOARD – SAFE COMPLETE VERSION
+# Downtime + MTTR + MTBF + Notification Analytics
 # ============================================================
 
-st.subheader("📢 KPI #2 – Notification Compliance Dashboard")
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
 
 # ------------------------------------------------------------
-# PREPARE NOTIFICATION DATA
+# PAGE CONFIG
 # ------------------------------------------------------------
+st.set_page_config(page_title="Management KPI Review", layout="wide")
 
-notif_df = df.copy()
+st.title("📊 Management Operational KPI Dashboard")
+st.markdown("### January – February 2026 Performance Review")
+st.markdown("---")
 
-notif_summary = (
-    notif_df
-    .groupby(["Date_Clean", "Notification_Status"])
-    .size()
-    .unstack(fill_value=0)
-    .reset_index()
+# ------------------------------------------------------------
+# LOAD DATA
+# ------------------------------------------------------------
+try:
+    df = pd.read_csv("data/cleaned_downtime_data.csv")
+except:
+    st.error("Data file not found. Please check path.")
+    st.stop()
+
+# Ensure required columns exist
+required_columns = ["Date_Clean", "Machine", "Consumed_Hours"]
+
+for col in required_columns:
+    if col not in df.columns:
+        st.error(f"Missing required column: {col}")
+        st.stop()
+
+df["Date_Clean"] = pd.to_datetime(df["Date_Clean"], errors="coerce")
+df["Consumed_Hours"] = pd.to_numeric(df["Consumed_Hours"], errors="coerce").fillna(0)
+
+# ------------------------------------------------------------
+# ================= DOWNTIME KPI SECTION =====================
+# ------------------------------------------------------------
+st.header("⚙️ Downtime Performance Analytics")
+
+TOTAL_DAYS = df["Date_Clean"].nunique()
+TOTAL_MACHINES = df["Machine"].nunique()
+TOTAL_DOWNTIME = df["Consumed_Hours"].sum()
+
+DAILY_DOWNTIME = df.groupby("Date_Clean")["Consumed_Hours"].sum().reset_index()
+MACHINE_DOWNTIME = df.groupby("Machine")["Consumed_Hours"].sum().reset_index()
+
+AVERAGE_DAILY_DOWNTIME = TOTAL_DOWNTIME / TOTAL_DAYS if TOTAL_DAYS else 0
+
+AVAILABLE_HOURS = TOTAL_DAYS * 24 * TOTAL_MACHINES
+AVAILABILITY_PERCENT = (
+    (1 - (TOTAL_DOWNTIME / AVAILABLE_HOURS)) * 100
+    if AVAILABLE_HOURS else 0
 )
 
-# Ensure both columns exist
-if "With Notification" not in notif_summary.columns:
-    notif_summary["With Notification"] = 0
-if "Without Notification" not in notif_summary.columns:
-    notif_summary["Without Notification"] = 0
+ZERO_DOWNTIME_DAYS = DAILY_DOWNTIME[
+    DAILY_DOWNTIME["Consumed_Hours"] == 0
+].shape[0]
 
-notif_summary["Total_Jobs"] = (
-    notif_summary["With Notification"] +
-    notif_summary["Without Notification"]
-)
+PEAK_DOWNTIME_DAY = DAILY_DOWNTIME.loc[
+    DAILY_DOWNTIME["Consumed_Hours"].idxmax()
+] if not DAILY_DOWNTIME.empty else None
 
-notif_summary["Compliance_%"] = (
-    notif_summary["With Notification"] /
-    notif_summary["Total_Jobs"]
-) * 100
+DOWNTIME_STD = DAILY_DOWNTIME["Consumed_Hours"].std()
 
-# ------------------------------------------------------------
-# GLOBAL METRICS
-# ------------------------------------------------------------
+FAILURE_COUNT = df.shape[0]
 
-TOTAL_JOBS = notif_summary["Total_Jobs"].sum()
-TOTAL_WITH = notif_summary["With Notification"].sum()
-TOTAL_WITHOUT = notif_summary["Without Notification"].sum()
+MTTR = TOTAL_DOWNTIME / FAILURE_COUNT if FAILURE_COUNT else 0
+TOTAL_OPERATING_TIME = AVAILABLE_HOURS - TOTAL_DOWNTIME
+MTBF = TOTAL_OPERATING_TIME / FAILURE_COUNT if FAILURE_COUNT else 0
 
-OVERALL_COMPLIANCE = (TOTAL_WITH / TOTAL_JOBS) * 100
-OVERALL_NON_COMPLIANCE = (TOTAL_WITHOUT / TOTAL_JOBS) * 100
-
-BEST_DAY = notif_summary.loc[notif_summary["Compliance_%"].idxmax()]
-WORST_DAY = notif_summary.loc[notif_summary["Compliance_%"].idxmin()]
-
-COMPLIANCE_STD = notif_summary["Compliance_%"].std()
-
-# ------------------------------------------------------------
-# EXECUTIVE METRIC CARDS
-# ------------------------------------------------------------
-
+# ---------------- EXECUTIVE CARDS ----------------
 col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("Total Jobs", int(TOTAL_JOBS))
-col2.metric("With Notification %", f"{OVERALL_COMPLIANCE:.1f}%")
-col3.metric("Without Notification %", f"{OVERALL_NON_COMPLIANCE:.1f}%")
-col4.metric("Compliance Stability (Std Dev)", f"{COMPLIANCE_STD:.2f}")
+col1.metric("Total Downtime (hrs)", round(TOTAL_DOWNTIME, 2))
+col2.metric("Avg Daily Downtime (hrs)", round(AVERAGE_DAILY_DOWNTIME, 2))
+col3.metric("Availability (%)", round(AVAILABILITY_PERCENT, 2))
+col4.metric("Zero Downtime Days", ZERO_DOWNTIME_DAYS)
 
-col5, col6 = st.columns(2)
+col5, col6, col7, col8 = st.columns(4)
 
-col5.metric(
-    "Best Compliance Day",
-    BEST_DAY["Date_Clean"].date(),
-    f"{BEST_DAY['Compliance_%']:.1f}%"
-)
+col5.metric("Peak Downtime Day",
+            PEAK_DOWNTIME_DAY["Date_Clean"].date()
+            if PEAK_DOWNTIME_DAY is not None else "N/A")
 
-col6.metric(
-    "Worst Compliance Day",
-    WORST_DAY["Date_Clean"].date(),
-    f"{WORST_DAY['Compliance_%']:.1f}%"
-)
+col6.metric("Peak Downtime (hrs)",
+            round(PEAK_DOWNTIME_DAY["Consumed_Hours"], 2)
+            if PEAK_DOWNTIME_DAY is not None else 0)
+
+col7.metric("MTTR (hrs)", round(MTTR, 2))
+col8.metric("MTBF (hrs)", round(MTBF, 2))
+
+st.markdown("---")
+
+# ---------------- DAILY TREND ----------------
+if not DAILY_DOWNTIME.empty:
+    fig1 = px.line(
+        DAILY_DOWNTIME,
+        x="Date_Clean",
+        y="Consumed_Hours",
+        markers=True,
+        title="Daily Downtime Trend",
+        template="plotly_dark"
+    )
+    st.plotly_chart(fig1, use_container_width=True)
+
+# ---------------- MACHINE PARETO ----------------
+if not MACHINE_DOWNTIME.empty:
+    MACHINE_DOWNTIME = MACHINE_DOWNTIME.sort_values(
+        by="Consumed_Hours",
+        ascending=False
+    )
+
+    MACHINE_DOWNTIME["Cumulative_%"] = (
+        MACHINE_DOWNTIME["Consumed_Hours"].cumsum() /
+        MACHINE_DOWNTIME["Consumed_Hours"].sum()
+    ) * 100
+
+    fig2 = go.Figure()
+
+    fig2.add_bar(
+        x=MACHINE_DOWNTIME["Machine"],
+        y=MACHINE_DOWNTIME["Consumed_Hours"],
+        name="Downtime"
+    )
+
+    fig2.add_scatter(
+        x=MACHINE_DOWNTIME["Machine"],
+        y=MACHINE_DOWNTIME["Cumulative_%"],
+        name="Cumulative %",
+        yaxis="y2"
+    )
+
+    fig2.update_layout(
+        title="Machine Downtime Pareto (80/20)",
+        template="plotly_dark",
+        yaxis2=dict(overlaying="y", side="right", range=[0, 100]),
+        height=500
+    )
+
+    st.plotly_chart(fig2, use_container_width=True)
 
 st.markdown("---")
 
 # ------------------------------------------------------------
-# BEAUTIFUL STACKED BAR – DAILY BREAKDOWN
+# ================= NOTIFICATION KPI SECTION =================
 # ------------------------------------------------------------
+st.header("📢 Notification Compliance Analytics")
 
-fig1 = px.bar(
-    notif_summary,
-    x="Date_Clean",
-    y=["With Notification", "Without Notification"],
-    title="Daily Jobs – With vs Without Notification",
-    barmode="stack",
-    template="plotly_dark"
-)
+if "Notification_Status" in df.columns:
 
-fig1.update_layout(
-    xaxis_title="Date",
-    yaxis_title="Number of Jobs",
-    legend_title="Notification Status",
-    height=500
-)
+    notif_summary = (
+        df.groupby(["Date_Clean", "Notification_Status"])
+        .size()
+        .unstack(fill_value=0)
+        .reset_index()
+    )
 
-st.plotly_chart(fig1, use_container_width=True)
+    notif_summary["With Notification"] = notif_summary.get("With Notification", 0)
+    notif_summary["Without Notification"] = notif_summary.get("Without Notification", 0)
 
-# ------------------------------------------------------------
-# COMPLIANCE TREND LINE
-# ------------------------------------------------------------
+    notif_summary["Total_Jobs"] = (
+        notif_summary["With Notification"] +
+        notif_summary["Without Notification"]
+    )
 
-fig2 = px.line(
-    notif_summary,
-    x="Date_Clean",
-    y="Compliance_%",
-    markers=True,
-    title="Daily Notification Compliance %",
-    template="plotly_dark"
-)
+    notif_summary["Compliance_%"] = (
+        notif_summary["With Notification"] /
+        notif_summary["Total_Jobs"].replace(0, np.nan)
+    ) * 100
 
-fig2.update_layout(
-    yaxis=dict(range=[0, 100]),
-    height=450
-)
+    TOTAL_JOBS = notif_summary["Total_Jobs"].sum()
+    TOTAL_WITH = notif_summary["With Notification"].sum()
+    TOTAL_WITHOUT = notif_summary["Without Notification"].sum()
 
-st.plotly_chart(fig2, use_container_width=True)
+    OVERALL_COMPLIANCE = (TOTAL_WITH / TOTAL_JOBS * 100) if TOTAL_JOBS else 0
 
-# ------------------------------------------------------------
-# 7-DAY ROLLING TREND
-# ------------------------------------------------------------
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Jobs", int(TOTAL_JOBS))
+    col2.metric("Overall Compliance %", f"{OVERALL_COMPLIANCE:.1f}%")
+    col3.metric("Without Notification", int(TOTAL_WITHOUT))
 
-notif_summary["Rolling_7Day_Compliance"] = (
-    notif_summary["Compliance_%"]
-    .rolling(7)
-    .mean()
-)
+    fig3 = px.bar(
+        notif_summary,
+        x="Date_Clean",
+        y=["With Notification", "Without Notification"],
+        barmode="stack",
+        title="Daily Jobs – Notification Status",
+        template="plotly_dark"
+    )
 
-fig3 = px.line(
-    notif_summary,
-    x="Date_Clean",
-    y="Rolling_7Day_Compliance",
-    title="7-Day Rolling Compliance Trend",
-    template="plotly_dark"
-)
+    st.plotly_chart(fig3, use_container_width=True)
 
-fig3.update_layout(
-    yaxis=dict(range=[0, 100]),
-    height=450
-)
+    fig4 = px.line(
+        notif_summary,
+        x="Date_Clean",
+        y="Compliance_%",
+        markers=True,
+        title="Daily Compliance %",
+        template="plotly_dark"
+    )
 
-st.plotly_chart(fig3, use_container_width=True)
+    fig4.update_layout(yaxis=dict(range=[0, 100]))
+    st.plotly_chart(fig4, use_container_width=True)
 
-# ------------------------------------------------------------
-# PIE CHART – OVERALL DISTRIBUTION
-# ------------------------------------------------------------
-
-fig4 = px.pie(
-    values=[TOTAL_WITH, TOTAL_WITHOUT],
-    names=["With Notification", "Without Notification"],
-    title="Overall Notification Distribution",
-    template="plotly_dark",
-    hole=0.5
-)
-
-st.plotly_chart(fig4, use_container_width=True)
-
-# ------------------------------------------------------------
-# BEAUTIFUL EXECUTIVE TABLE
-# ------------------------------------------------------------
-
-styled_table = notif_summary.style \
-    .background_gradient(subset=["Compliance_%"], cmap="YlGn") \
-    .format({
-        "Compliance_%": "{:.1f}%",
-        "Rolling_7Day_Compliance": "{:.1f}%"
-    })
-
-st.markdown("### 📋 Detailed Daily Notification Table")
-st.dataframe(styled_table, use_container_width=True)
+else:
+    st.warning("Notification_Status column not found in dataset.")
