@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 
 # -----------------------------
 # Helper functions
@@ -100,66 +101,26 @@ equipment_df = add_hours_column(equipment_df, "Time")
 
 # 6) Daily data (Jan–Feb–1 Mar)
 daily_data = [
-    ("1-Jan", "13:01:00"),
-    ("2-Jan", "11:28:00"),
-    ("3-Jan", "5:37:00"),
-    ("4-Jan", "9:27:00"),
-    ("5-Jan", "5:02:00"),
-    ("6-Jan", "9:00:00"),
-    ("7-Jan", "11:06:00"),
-    ("8-Jan", "10:50:00"),
-    ("9-Jan", "19:26:00"),
-    ("10-Jan", "13:16:00"),
-    ("11-Jan", "7:40:00"),
-    ("12-Jan", "14:18:00"),
-    ("13-Jan", "3:12:00"),
-    ("14-Jan", "7:24:00"),
-    ("15-Jan", "11:09:00"),
-    ("16-Jan", "6:53:00"),
-    ("17-Jan", "7:52:00"),
-    ("18-Jan", "6:17:00"),
-    ("19-Jan", "14:14:00"),
-    ("20-Jan", "3:20:00"),
-    ("21-Jan", "6:35:00"),
-    ("22-Jan", "6:09:00"),
-    ("23-Jan", "7:32:00"),
-    ("24-Jan", "10:41:00"),
-    ("25-Jan", "7:28:00"),
-    ("26-Jan", "7:09:00"),
-    ("27-Jan", "5:39:00"),
-    ("28-Jan", "10:56:00"),
-    ("29-Jan", "11:34:00"),
-    ("30-Jan", "2:30:00"),
-    ("31-Jan", "8:06:00"),
-    ("1-Feb", "3:35:00"),
-    ("2-Feb", "10:08:00"),
-    ("3-Feb", "9:03:00"),
-    ("4-Feb", "6:17:00"),
-    ("5-Feb", "8:39:00"),
-    ("6-Feb", "7:33:00"),
-    ("7-Feb", "7:43:00"),
-    ("8-Feb", "8:13:00"),
-    ("9-Feb", "7:22:00"),
-    ("10-Feb", "6:13:00"),
-    ("11-Feb", "16:20:00"),
-    ("12-Feb", "8:54:00"),
-    ("13-Feb", "8:16:00"),
-    ("14-Feb", "11:33:00"),
-    ("15-Feb", "11:24:00"),
-    ("16-Feb", "6:45:00"),
-    ("17-Feb", "10:36:00"),
-    ("18-Feb", "9:30:00"),
-    ("19-Feb", "6:55:00"),
-    ("20-Feb", "11:33:00"),
-    ("21-Feb", "8:30:00"),
-    ("22-Feb", "13:30:00"),
-    ("23-Feb", "17:22:00"),
-    ("24-Feb", "7:15:00"),
-    ("25-Feb", "11:38:00"),
-    ("26-Feb", "22:00:00"),
-    ("27-Feb", "11:15:00"),
-    ("28-Feb", "6:35:00"),
-    ("1-Mar", "0:10:00"),
+    ("1-Jan", "13:01:00"), ("2-Jan", "11:28:00"), ("3-Jan", "5:37:00"),
+    ("4-Jan", "9:27:00"), ("5-Jan", "5:02:00"), ("6-Jan", "9:00:00"),
+    ("7-Jan", "11:06:00"), ("8-Jan", "10:50:00"), ("9-Jan", "19:26:00"),
+    ("10-Jan", "13:16:00"), ("11-Jan", "7:40:00"), ("12-Jan", "14:18:00"),
+    ("13-Jan", "3:12:00"), ("14-Jan", "7:24:00"), ("15-Jan", "11:09:00"),
+    ("16-Jan", "6:53:00"), ("17-Jan", "7:52:00"), ("18-Jan", "6:17:00"),
+    ("19-Jan", "14:14:00"), ("20-Jan", "3:20:00"), ("21-Jan", "6:35:00"),
+    ("22-Jan", "6:09:00"), ("23-Jan", "7:32:00"), ("24-Jan", "10:41:00"),
+    ("25-Jan", "7:28:00"), ("26-Jan", "7:09:00"), ("27-Jan", "5:39:00"),
+    ("28-Jan", "10:56:00"), ("29-Jan", "11:34:00"), ("30-Jan", "2:30:00"),
+    ("31-Jan", "8:06:00"), ("1-Feb", "3:35:00"), ("2-Feb", "10:08:00"),
+    ("3-Feb", "9:03:00"), ("4-Feb", "6:17:00"), ("5-Feb", "8:39:00"),
+    ("6-Feb", "7:33:00"), ("7-Feb", "7:43:00"), ("8-Feb", "8:13:00"),
+    ("9-Feb", "7:22:00"), ("10-Feb", "6:13:00"), ("11-Feb", "16:20:00"),
+    ("12-Feb", "8:54:00"), ("13-Feb", "8:16:00"), ("14-Feb", "11:33:00"),
+    ("15-Feb", "11:24:00"), ("16-Feb", "6:45:00"), ("17-Feb", "10:36:00"),
+    ("18-Feb", "9:30:00"), ("19-Feb", "6:55:00"), ("20-Feb", "11:33:00"),
+    ("21-Feb", "8:30:00"), ("22-Feb", "13:30:00"), ("23-Feb", "17:22:00"),
+    ("24-Feb", "7:15:00"), ("25-Feb", "11:38:00"), ("26-Feb", "22:00:00"),
+    ("27-Feb", "11:15:00"), ("28-Feb", "6:35:00"), ("1-Mar", "0:10:00"),
 ]
 daily_df = pd.DataFrame(daily_data, columns=["Date", "Time"])
 daily_df = add_hours_column(daily_df, "Time")
@@ -201,8 +162,8 @@ try:
 except Exception:
     pass
 
-st.title("Mr. Omer KPI Review – Drinkable Breakdown Executive Dashboard")
-st.caption("Period: Jan–Feb–2026 | All figures based on maintenance LogSheet downtime (B/D+Corrective).")
+st.title("📊 **Management KPI Review – Executive Breakdown Dashboard**")
+st.caption("Period: Jan–Feb–1 Mar 2026 | All figures based on maintenance downtime (HH:MM:SS).")
 
 # -----------------------------
 # Top KPI row
@@ -211,28 +172,28 @@ kpi1, kpi2, kpi3, kpi4 = st.columns(4)
 
 with kpi1:
     st.metric(
-        "Total Downtime",
+        "🔵 **Total Downtime**",
         f"{int(total_hours):,} h",
         help=str(total_duration),
     )
 
 with kpi2:
     st.metric(
-        "Mechanical vs Electrical",
+        "🟣 **Mechanical vs Electrical**",
         f"{mech_pct:0.1f}% Mech / {elect_pct:0.1f}% Elect",
         help=f"Mech: {mech_hours:0.1f} h | Elect: {elect_hours:0.1f} h",
     )
 
 with kpi3:
     st.metric(
-        "Breakdown vs Corrective",
+        "🔴 **Breakdown vs Corrective**",
         f"{bd_pct:0.1f}% B/D / {corr_pct:0.1f}% Corr",
         help=f"B/D: {bd_hours:0.1f} h | Corr: {corr_hours:0.1f} h",
     )
 
 with kpi4:
     st.metric(
-        "Top Area by Downtime",
+        "🟢 **Top Area**",
         f"{top_area['Area']}",
         help=f"{top_area['Hours']:0.1f} h",
     )
@@ -245,71 +206,80 @@ st.markdown("---")
 c1, c2, c3 = st.columns([1.2, 1.2, 1])
 
 with c1:
-    st.subheader("Downtime by Area")
+    st.subheader("🏭 **Downtime by Area**")
     fig_area = px.pie(
         area_df,
         names="Area",
         values="Hours",
         hole=0.4,
-        color_discrete_sequence=px.colors.sequential.Blues_r,
+        color_discrete_sequence=px.colors.qualitative.Bold,
     )
-    fig_area.update_layout(showlegend=True)
+    fig_area.update_layout(
+        showlegend=True,
+        font=dict(size=14, color="black"),
+    )
     st.plotly_chart(fig_area, use_container_width=True)
-    st.dataframe(area_df[["Area", "Time", "Hours"]].sort_values("Hours", ascending=False))
+    st.dataframe(area_df.sort_values("Hours", ascending=False))
 
 with c2:
-    st.subheader("Downtime by Category")
+    st.subheader("⚙️ **Downtime by Category**")
     fig_cat = px.bar(
         category_df.sort_values("Hours", ascending=False),
         x="Category",
         y="Hours",
         color="Category",
-        color_discrete_sequence=px.colors.sequential.Viridis,
+        color_discrete_sequence=px.colors.qualitative.Vivid,
     )
-    fig_cat.update_layout(xaxis_title="", yaxis_title="Hours")
+    fig_cat.update_layout(
+        xaxis_title="",
+        yaxis_title="Hours",
+        font=dict(size=14, color="black"),
+    )
     st.plotly_chart(fig_cat, use_container_width=True)
-    st.dataframe(category_df[["Category", "Time", "Hours"]].sort_values("Hours", ascending=False))
+    st.dataframe(category_df.sort_values("Hours", ascending=False))
 
 with c3:
-    st.subheader("Breakdown vs Corrective")
+    st.subheader("🛠 **Breakdown vs Corrective**")
     fig_bd = px.pie(
         bd_corr_df,
         names="Type",
         values="Hours",
         color="Type",
-        color_discrete_map={"B/D": "#d62728", "Corrective": "#1f77b4"},
+        color_discrete_map={"B/D": "#ff4d4d", "Corrective": "#4d79ff"},
         hole=0.5,
     )
+    fig_bd.update_layout(font=dict(size=14, color="black"))
     st.plotly_chart(fig_bd, use_container_width=True)
-    st.dataframe(bd_corr_df[["Type", "Time", "Hours"]])
+    st.dataframe(bd_corr_df)
 
 st.markdown("---")
 
 # -----------------------------
 # Machine-wise view
 # -----------------------------
-st.subheader("Machine-wise Downtime (Pareto View)")
+st.subheader("🧱 **Machine-wise Downtime (Pareto View)**")
 machines_sorted = machines_df.sort_values("Hours", ascending=False)
 fig_machines = px.bar(
     machines_sorted,
     x="Machine",
     y="Hours",
     color="Hours",
-    color_continuous_scale="Reds",
+    color_continuous_scale="Turbo",
 )
 fig_machines.update_layout(
     xaxis_title="Machine",
     yaxis_title="Hours",
+    font=dict(size=14, color="black"),
 )
 st.plotly_chart(fig_machines, use_container_width=True)
-st.dataframe(machines_sorted[["Machine", "Time", "Hours"]])
+st.dataframe(machines_sorted)
 
 st.markdown("---")
 
 # -----------------------------
 # Equipment-wise view (Executive Pareto)
 # -----------------------------
-st.subheader("Equipment-wise Downtime – Executive Pareto")
+st.subheader("🏗 **Equipment-wise Downtime – Executive Pareto**")
 
 equipment_sorted = equipment_df.sort_values("Hours", ascending=False)
 equipment_sorted["Cumulative %"] = equipment_sorted["Hours"].cumsum() / equipment_sorted["Hours"].sum() * 100
@@ -322,17 +292,18 @@ with c_eq1:
         x="Equipment",
         y="Hours",
         color="Hours",
-        color_continuous_scale="Purples",
+        color_continuous_scale="Rainbow",
     )
     fig_eq.update_layout(
         xaxis_title="Equipment",
         yaxis_title="Hours",
         xaxis_tickangle=-45,
+        font=dict(size=14, color="black"),
     )
     st.plotly_chart(fig_eq, use_container_width=True)
 
 with c_eq2:
-    st.write("Top Equipment Contributors")
+    st.write("**Top Equipment Contributors**")
     st.dataframe(
         equipment_sorted[["Equipment", "Time", "Hours", "Cumulative %"]].head(10)
     )
@@ -342,38 +313,38 @@ st.markdown("---")
 # -----------------------------
 # Daily trend view
 # -----------------------------
-st.subheader("Daily Downtime Trend (Jan–Feb–1 Mar 2026)")
+st.subheader("📅 **Daily Downtime Trend (Jan–Feb–1 Mar 2026)**")
 
-# Try to parse dates for nicer x-axis
-daily_df["Date_parsed"] = pd.to_datetime(daily_df["Date"], format="%d-%b", errors="ignore")
 fig_daily = px.line(
     daily_df,
     x="Date",
     y="Hours",
     markers=True,
+    color_discrete_sequence=["#ff0066"],
 )
 fig_daily.update_layout(
     xaxis_title="Date",
     yaxis_title="Hours",
+    font=dict(size=14, color="black"),
 )
 st.plotly_chart(fig_daily, use_container_width=True)
-st.dataframe(daily_df[["Date", "Time", "Hours"]])
+st.dataframe(daily_df)
 
 st.markdown("---")
 
 # -----------------------------
-# Executive summary text (short, focused)
+# Executive summary text
 # -----------------------------
-st.subheader("Executive Insight – Key Loss Drivers")
+st.subheader("📌 **Executive Insight – Key Loss Drivers**")
 
 st.markdown(
     f"""
 - **Total downtime:** **{int(total_hours)} hours** ({total_duration})  
-- **Primary loss area:** **{top_area['Area']}** with **{top_area['Hours']:.1f} h**.  
-- **Top equipment:** **{top_equipment['Equipment']}** with **{top_equipment['Hours']:.1f} h**.  
-- **Top machine tag:** **{top_machine['Machine']}** with **{top_machine['Hours']:.1f} h**.  
-- **Mechanical share:** **{mech_pct:0.1f}%** vs **Electrical:** **{elect_pct:0.1f}%** of total downtime.  
-- **Breakdown vs Corrective:** **{bd_pct:0.1f}% B/D** and **{corr_pct:0.1f}% Corrective**.  
-- **Peak days:** visible around **26-Feb**, **23-Feb**, and **11-Feb** on the trend chart.
+- **Primary loss area:** **{top_area['Area']}** with **{top_area['Hours']:.1f} h**  
+- **Top equipment:** **{top_equipment['Equipment']}** with **{top_equipment['Hours']:.1f} h**  
+- **Top machine:** **{top_machine['Machine']}** with **{top_machine['Hours']:.1f} h**  
+- **Mechanical share:** **{mech_pct:0.1f}%** vs **Electrical:** **{elect_pct:0.1f}%**  
+- **Breakdown vs Corrective:** **{bd_pct:0.1f}% B/D** and **{corr_pct:0.1f}% Corrective**  
+- **Peak downtime days:** **26-Feb**, **23-Feb**, **11-Feb**
 """
 )
