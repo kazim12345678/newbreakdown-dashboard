@@ -201,8 +201,8 @@ try:
 except Exception:
     pass
 
-st.title("Management KPI Review – Line Breakdown Executive Dashboard")
-st.caption("Period: Jan–Feb–1 Mar 2026 | All figures based on maintenance downtime (HH:MM:SS).")
+st.title("Mr. Omer KPI Review – Lines Breakdown Executive Dashboard")
+st.caption("Period: Jan–Feb–2026 | All figures based on maintenance LogSheet downtime (HH:MM:SS).")
 
 # -----------------------------
 # Top KPI row
