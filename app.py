@@ -201,7 +201,7 @@ try:
 except Exception:
     pass
 
-st.title("Mr. Omer KPI Review – Drinkable_Section Breakdown Executive Dashboard")
+st.title("Mr. Omer KPI Review – Drinkable Breakdown Executive Dashboard")
 st.caption("Period: Jan–Feb–2026 | All figures based on maintenance LogSheet downtime (B/D+Corrective).")
 
 # -----------------------------
