@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="Full Maintenance Dashboard", layout="wide")
+st.set_page_config(page_title="Full Maintenance Dashboard 2026", layout="wide")
 
 # -----------------------------
 # Helper: convert HH:MM to hours
@@ -14,8 +14,11 @@ def to_hours(t):
     h, m = map(int, t.split(":"))
     return h + m/60
 
-st.title("📊 Full Maintenance Dashboard – Jan, Feb, 1 Mar 2026")
-st.write("This dashboard shows daily, hourly, machine, area, classification, technician, and notification breakdowns.")
+st.title("Full Maintenance Dashboard – Jan, Feb, 1 Mar 2026")
+st.write(
+    "This page shows daily, hourly, machine, area, classification, technician, "
+    "and notification breakdowns for maintenance performance."
+)
 
 # ============================================================
 # 1) DAILY BREAKDOWN TREND
@@ -38,16 +41,16 @@ daily_data = [
     ("2/25/2026",698),("2/26/2026",1320),("2/27/2026",675),("2/28/2026",395),
     ("3/1/2026",10)
 ]
-df_daily = pd.DataFrame(daily_data, columns=["Date","Minutes"])
+df_daily = pd.DataFrame(daily_data, columns=["Date", "Minutes"])
 df_daily["Date"] = pd.to_datetime(df_daily["Date"])
 df_daily["Hours"] = df_daily["Minutes"] / 60
 
-st.subheader("📅 Daily Breakdown Trend")
-fig, ax = plt.subplots(figsize=(12,4))
-ax.plot(df_daily["Date"], df_daily["Hours"], marker="o", color="#ff0066")
-ax.set_ylabel("Hours")
-ax.grid(True, linestyle="--", alpha=0.4)
-st.pyplot(fig)
+st.subheader("Daily Breakdown Trend")
+fig_daily, ax_daily = plt.subplots(figsize=(12, 4))
+ax_daily.plot(df_daily["Date"], df_daily["Hours"], marker="o", color="#ff0066")
+ax_daily.set_ylabel("Breakdown Hours")
+ax_daily.grid(True, linestyle="--", alpha=0.4)
+st.pyplot(fig_daily)
 
 # ============================================================
 # 2) HOUR-WISE BREAKDOWN
@@ -59,7 +62,7 @@ hour_data = [
     (17,"13:39"),(18,"33:21"),(19,"6:13"),(20,"29:51"),(21,"26:19"),
     (22,"30:06"),(23,"24:51")
 ]
-df_hour = pd.DataFrame(hour_data, columns=["Hour","Time"])
+df_hour = pd.DataFrame(hour_data, columns=["Hour", "Time"])
 df_hour["Hours"] = df_hour["Time"].apply(to_hours)
 
 # ============================================================
@@ -71,7 +74,10 @@ machine_data = [
     ("M18",30.216),("M2",35.060),("M3",31.498),("M4",31.734),
     ("M5",1.499),("M6",58.450),("M7",47.500),("M8",37.363),("M9",3.217)
 ]
-df_machine = pd.DataFrame(machine_data, columns=["Machine","Hours"]).sort_values("Hours", ascending=False)
+df_machine = (
+    pd.DataFrame(machine_data, columns=["Machine", "Hours"])
+    .sort_values("Hours", ascending=False)
+)
 
 # ============================================================
 # 4) AREA-WISE BREAKDOWN
@@ -82,7 +88,7 @@ area_data = [
     ("Filling & Capping",15903),
     ("Upstream",3191),
 ]
-df_area = pd.DataFrame(area_data, columns=["Area","Minutes"])
+df_area = pd.DataFrame(area_data, columns=["Area", "Minutes"])
 df_area["Hours"] = df_area["Minutes"] / 60
 df_area = df_area.sort_values("Hours", ascending=False)
 
@@ -111,7 +117,7 @@ class_data = [
     ("Sleeve Applicator & Heating Tunnel",362),
     ("Turret Bottle Cleaner / Rinser",648),
 ]
-df_class = pd.DataFrame(class_data, columns=["Equipment","Minutes"])
+df_class = pd.DataFrame(class_data, columns=["Equipment", "Minutes"])
 df_class["Hours"] = df_class["Minutes"] / 60
 df_class = df_class.sort_values("Hours", ascending=False)
 
@@ -130,7 +136,7 @@ tech_data = [
     ("yousef","10:12"),("yousef k","0:40"),("yousef s","0:40"),
     ("yousefk","13:02"),("yousefs","15:48"),
 ]
-df_tech = pd.DataFrame(tech_data, columns=["Technician","Total"])
+df_tech = pd.DataFrame(tech_data, columns=["Technician", "Total"])
 df_tech["Hours"] = df_tech["Total"].apply(to_hours)
 df_tech["Technician"] = df_tech["Technician"].str.title()
 df_tech = df_tech.sort_values("Hours", ascending=False)
@@ -202,34 +208,40 @@ notif_data = [
 df_notif = pd.DataFrame(
     notif_data,
     columns=[
-        "Date","Notifications_Received","Jobs_Without_Notification",
-        "Corrective_With_Notif","BD_With_Notif",
-        "Corrective_Without_Notif","BD_Without_Notif"
+        "Date", "Notifications_Received", "Jobs_Without_Notification",
+        "Corrective_With_Notif", "BD_With_Notif",
+        "Corrective_Without_Notif", "BD_Without_Notif"
     ]
 )
-notif_totals = df_notif.iloc[:,1:].sum()
+notif_totals = df_notif.iloc[:, 1:].sum()
 
 # ============================================================
 # ROW 2 — Hour-wise + Machine-wise
 # ============================================================
-st.subheader("⏱ Hour-wise Breakdown & 🛠 Machine-wise Breakdown")
+st.subheader("Hour-wise Breakdown and Machine-wise Breakdown")
 col1, col2 = st.columns(2)
 
 with col1:
-    fig2, ax2 = plt.subplots(figsize=(7,4))
-    ax2.bar(df_hour["Hour"], df_hour["Hours"],
-            color=plt.cm.turbo(df_hour["Hours"]/df_hour["Hours"].max()))
-    ax2.set_title("Hour-wise Breakdown (0–23)", fontsize=14)
+    fig2, ax2 = plt.subplots(figsize=(7, 4))
+    ax2.bar(
+        df_hour["Hour"],
+        df_hour["Hours"],
+        color=plt.cm.turbo(df_hour["Hours"] / df_hour["Hours"].max())
+    )
+    ax2.set_title("Hour-wise Breakdown (0–23)")
     ax2.set_xlabel("Hour of Day")
     ax2.set_ylabel("Hours")
     ax2.grid(axis="y", linestyle="--", alpha=0.4)
     st.pyplot(fig2)
 
 with col2:
-    fig3, ax3 = plt.subplots(figsize=(7,4))
-    ax3.barh(df_machine["Machine"], df_machine["Hours"],
-             color=plt.cm.plasma(df_machine["Hours"]/df_machine["Hours"].max()))
-    ax3.set_title("Machine-wise Breakdown (Hours)", fontsize=14)
+    fig3, ax3 = plt.subplots(figsize=(7, 4))
+    ax3.barh(
+        df_machine["Machine"],
+        df_machine["Hours"],
+        color=plt.cm.plasma(df_machine["Hours"] / df_machine["Hours"].max())
+    )
+    ax3.set_title("Machine-wise Breakdown (Hours)")
     ax3.invert_yaxis()
     ax3.grid(axis="x", linestyle="--", alpha=0.4)
     st.pyplot(fig3)
@@ -237,21 +249,58 @@ with col2:
 # ============================================================
 # ROW 3 — Area-wise + Machine Classification
 # ============================================================
-st.subheader("🏭 Area-wise Breakdown & ⚙ Machine Classification Breakdown")
+st.subheader("Area-wise Breakdown and Machine Classification Breakdown")
 col3, col4 = st.columns(2)
 
 with col3:
-    fig4, ax4 = plt.subplots(figsize=(7,4))
-    ax4.bar(df_area["Area"], df_area["Hours"],
-            color=plt.cm.viridis(df_area["Hours"]/df_area["Hours"].max()))
-    ax4.set_title("Area-wise Breakdown (Hours)", fontsize=14)
+    fig4, ax4 = plt.subplots(figsize=(7, 4))
+    ax4.bar(
+        df_area["Area"],
+        df_area["Hours"],
+        color=plt.cm.viridis(df_area["Hours"] / df_area["Hours"].max())
+    )
+    ax4.set_title("Area-wise Breakdown (Hours)")
     ax4.set_xticklabels(df_area["Area"], rotation=25, ha="right")
     ax4.set_ylabel("Hours")
     ax4.grid(axis="y", linestyle="--", alpha=0.4)
     st.pyplot(fig4)
 
 with col4:
-    fig5, ax5 = plt.subplots(figsize=(7,6))
-    ax5.barh(df_class["Equipment"], df_class["Hours"],
-             color=plt.cm.cividis(df_class["Hours"]/df_class["Hours"].max()))
-    ax5.set_title("Machine Classification Breakdown (Hours)", fontsize=
+    fig5, ax5 = plt.subplots(figsize=(7, 6))
+    ax5.barh(
+        df_class["Equipment"],
+        df_class["Hours"],
+        color=plt.cm.cividis(df_class["Hours"] / df_class["Hours"].max())
+    )
+    ax5.set_title("Machine Classification Breakdown (Hours)")
+    ax5.invert_yaxis()
+    ax5.grid(axis="x", linestyle="--", alpha=0.4)
+    st.pyplot(fig5)
+
+# ============================================================
+# ROW 4 — Technician Performance + Notification Summary
+# ============================================================
+st.subheader("Technician Performance and Notification Summary")
+col5, col6 = st.columns(2)
+
+with col5:
+    fig6, ax6 = plt.subplots(figsize=(7, 5))
+    ax6.bar(
+        df_tech["Technician"],
+        df_tech["Hours"],
+        color=plt.cm.magma(df_tech["Hours"] / df_tech["Hours"].max())
+    )
+    ax6.set_title("Technician Performance – Total Maintenance Hours")
+    ax6.set_xticklabels(df_tech["Technician"], rotation=60, ha="right")
+    ax6.set_ylabel("Hours")
+    ax6.grid(axis="y", linestyle="--", alpha=0.4)
+    st.pyplot(fig6)
+
+with col6:
+    fig7, ax7 = plt.subplots(figsize=(7, 5))
+    ax7.bar(notif_totals.index, notif_totals.values, color="#00b894")
+    ax7.set_title("Notification Summary – Jan & Feb 2026")
+    ax7.set_xticklabels(notif_totals.index, rotation=45, ha="right")
+    ax7.set_ylabel("Total Count")
+    ax7.grid(axis="y", linestyle="--", alpha=0.4)
+    st.pyplot(fig7)
