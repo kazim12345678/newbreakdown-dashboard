@@ -1,260 +1,257 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
-import os
-from datetime import datetime
+import matplotlib.pyplot as plt
 
-# ----------------- PAGE CONFIG -----------------
-st.set_page_config(page_title="2026 – Drinkable Section Current Update", layout="wide")
-st.title("2026 – Drinkable Section Current Update")
+st.set_page_config(page_title="Full Maintenance Dashboard", layout="wide")
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "maintenance_data.xlsx")
+# -----------------------------
+# Helper: convert HH:MM to hours
+# -----------------------------
+def to_hours(t):
+    t = str(t).strip()
+    if t == "" or t.lower() == "nan":
+        return 0.0
+    h, m = map(int, t.split(":"))
+    return h + m/60
 
+st.title("📊 Full Maintenance Dashboard – Jan, Feb, 1 Mar 2026")
+st.write("This dashboard shows daily, hourly, machine, area, classification, technician, and notification breakdowns.")
 
-# ----------------- DETECT REAL HEADER -----------------
+# ============================================================
+# 1) DAILY BREAKDOWN TREND
+# ============================================================
+daily_data = [
+    ("1/1/2026",781),("1/2/2026",688),("1/3/2026",337),("1/4/2026",567),
+    ("1/5/2026",302),("1/6/2026",540),("1/7/2026",666),("1/8/2026",650),
+    ("1/9/2026",1166),("1/10/2026",796),("1/11/2026",460),("1/12/2026",858),
+    ("1/13/2026",192),("1/14/2026",444),("1/15/2026",669),("1/16/2026",413),
+    ("1/17/2026",472),("1/18/2026",377),("1/19/2026",854),("1/20/2026",200),
+    ("1/21/2026",395),("1/22/2026",369),("1/23/2026",452),("1/24/2026",641),
+    ("1/25/2026",448),("1/26/2026",429),("1/27/2026",339),("1/28/2026",656),
+    ("1/29/2026",694),("1/30/2026",150),("1/31/2026",486),
+    ("2/1/2026",215),("2/2/2026",608),("2/3/2026",543),("2/4/2026",377),
+    ("2/5/2026",519),("2/6/2026",453),("2/7/2026",463),("2/8/2026",493),
+    ("2/9/2026",442),("2/10/2026",373),("2/11/2026",980),("2/12/2026",534),
+    ("2/13/2026",496),("2/14/2026",693),("2/15/2026",684),("2/16/2026",405),
+    ("2/17/2026",636),("2/18/2026",570),("2/19/2026",415),("2/20/2026",693),
+    ("2/21/2026",510),("2/22/2026",810),("2/23/2026",1042),("2/24/2026",435),
+    ("2/25/2026",698),("2/26/2026",1320),("2/27/2026",675),("2/28/2026",395),
+    ("3/1/2026",10)
+]
+df_daily = pd.DataFrame(daily_data, columns=["Date","Minutes"])
+df_daily["Date"] = pd.to_datetime(df_daily["Date"])
+df_daily["Hours"] = df_daily["Minutes"] / 60
 
-def load_real_data(path):
-    df_raw = pd.read_excel(path, header=None)
+st.subheader("📅 Daily Breakdown Trend")
+fig, ax = plt.subplots(figsize=(12,4))
+ax.plot(df_daily["Date"], df_daily["Hours"], marker="o", color="#ff0066")
+ax.set_ylabel("Hours")
+ax.grid(True, linestyle="--", alpha=0.4)
+st.pyplot(fig)
 
-    # Find the row where the REAL header starts
-    header_keywords = [
-        "Date", "Machine No.", "Notification No.", "Shift",
-        "Area", "Machine Classification", "Job", "Type",
-        "Reported Problem", "Requested Time", "Description Of Work",
-        "Spare Part Used", "Start", "End", "Waiting Time",
-        "Time Consumed", "Performed By", "Remarks"
+# ============================================================
+# 2) HOUR-WISE BREAKDOWN
+# ============================================================
+hour_data = [
+    (0,"19:59"),(1,"28:00"),(2,"21:43"),(3,"21:21"),(4,"23:21"),(5,"5:14"),
+    (6,"20:42"),(7,"53:39"),(8,"21:34"),(9,"20:24"),(10,"21:31"),(11,"6:48"),
+    (12,"17:25"),(13,"31:42"),(14,"26:16"),(15,"31:08"),(16,"14:31"),
+    (17,"13:39"),(18,"33:21"),(19,"6:13"),(20,"29:51"),(21,"26:19"),
+    (22,"30:06"),(23,"24:51")
+]
+df_hour = pd.DataFrame(hour_data, columns=["Hour","Time"])
+df_hour["Hours"] = df_hour["Time"].apply(to_hours)
+
+# ============================================================
+# 3) MACHINE-WISE BREAKDOWN
+# ============================================================
+machine_data = [
+    ("Crates Area/Line",53.918),("M1",24.367),("M12",20.066),("M13",22.748),
+    ("M14",43.951),("M15",52.431),("M16",36.348),("M17",19.252),
+    ("M18",30.216),("M2",35.060),("M3",31.498),("M4",31.734),
+    ("M5",1.499),("M6",58.450),("M7",47.500),("M8",37.363),("M9",3.217)
+]
+df_machine = pd.DataFrame(machine_data, columns=["Machine","Hours"]).sort_values("Hours", ascending=False)
+
+# ============================================================
+# 4) AREA-WISE BREAKDOWN
+# ============================================================
+area_data = [
+    ("Crates Area /Line",3250),
+    ("Downline",10634),
+    ("Filling & Capping",15903),
+    ("Upstream",3191),
+]
+df_area = pd.DataFrame(area_data, columns=["Area","Minutes"])
+df_area["Hours"] = df_area["Minutes"] / 60
+df_area = df_area.sort_values("Hours", ascending=False)
+
+# ============================================================
+# 5) MACHINE CLASSIFICATION BREAKDOWN
+# ============================================================
+class_data = [
+    ("Bottle Debagger, Bottle Unscrambler",1611),
+    ("Bottle Inspection Machine, Bottle Invert Cleaner",263),
+    ("Bottle Line Conveyor,Overhead Bottle Conveyor, Air Conveyor",1292),
+    ("Cap Hooper / Elevator Unit",75),
+    ("Cap Sorter / Cap Conveyor Unit",150),
+    ("Cap Top Sticker Unit",15),
+    ("C-loop Crates Chute / Overhead Crates Conveyor",670),
+    ("Crates Destacker / Crates Washer / Crates lines",3220),
+    ("Crates Stacker & Unitizer Unit",2916),
+    ("Downline Conveyor Bottles, Wraps & Case Handling Line",165),
+    ("Filling and Capping Machine",13876),
+    ("Filling Machine Infeed Conveyor",135),
+    ("Filling Machine Outfeed Conveyor",103),
+    ("Ink Jet Printer Unit",926),
+    ("Labelling Machine",245),
+    ("Packer Machine & Heating Tunnel",5664),
+    ("Pallet Wrapping Machine",67),
+    ("Palletizer Machine",575),
+    ("Sleeve Applicator & Heating Tunnel",362),
+    ("Turret Bottle Cleaner / Rinser",648),
+]
+df_class = pd.DataFrame(class_data, columns=["Equipment","Minutes"])
+df_class["Hours"] = df_class["Minutes"] / 60
+df_class = df_class.sort_values("Hours", ascending=False)
+
+# ============================================================
+# 6) TECHNICIAN PERFORMANCE
+# ============================================================
+tech_data = [
+    ("ali","79:17"),("amgad","49:36"),("automation","0:20"),("automation mtc","19:34"),
+    ("dante","119:49"),("day","11:41"),("day shift","6:09"),("day shift maint. team","94:21"),
+    ("edgar","73:13"),("gilbert","65:20"),("husam","89:33"),("husam?moneef","0:35"),
+    ("hussam","1:10"),("jamal","33:47"),("lito","28:39"),("majid","1:18"),
+    ("moneef","37:43"),("nahswan","0:55"),("nashwan","113:14"),("night shift","3:46"),
+    ("night shift maint. team","74:04"),("nsahwan","0:19"),("operator","0:46"),
+    ("rakan","1:00"),("sai","0:25"),("sameer","62:28"),("sami","54:21"),
+    ("serac techn","0:20"),("workshop mtc","5:21"),("yosuefs","0:50"),
+    ("yousef","10:12"),("yousef k","0:40"),("yousef s","0:40"),
+    ("yousefk","13:02"),("yousefs","15:48"),
+]
+df_tech = pd.DataFrame(tech_data, columns=["Technician","Total"])
+df_tech["Hours"] = df_tech["Total"].apply(to_hours)
+df_tech["Technician"] = df_tech["Technician"].str.title()
+df_tech = df_tech.sort_values("Hours", ascending=False)
+
+# ============================================================
+# 7) NOTIFICATION SUMMARY
+# ============================================================
+notif_data = [
+    ("2026-01-01",22,9,14,8,6,3),
+    ("2026-01-02",7,20,5,2,13,7),
+    ("2026-01-03",9,12,4,5,10,2),
+    ("2026-01-04",14,8,9,5,6,2),
+    ("2026-01-05",12,4,8,4,4,0),
+    ("2026-01-06",20,4,8,12,4,0),
+    ("2026-01-07",24,13,12,12,8,5),
+    ("2026-01-08",25,5,8,17,5,0),
+    ("2026-01-09",8,11,2,6,9,2),
+    ("2026-01-10",18,6,8,10,5,1),
+    ("2026-01-11",17,3,10,7,3,0),
+    ("2026-01-12",16,3,4,12,1,2),
+    ("2026-01-13",9,5,9,0,5,0),
+    ("2026-01-14",14,6,6,8,5,1),
+    ("2026-01-15",19,5,11,8,5,0),
+    ("2026-01-16",19,3,9,10,3,0),
+    ("2026-01-17",15,5,8,7,5,0),
+    ("2026-01-18",7,8,4,3,8,0),
+    ("2026-01-19",25,2,14,11,1,1),
+    ("2026-01-20",7,5,6,1,5,0),
+    ("2026-01-21",14,8,2,12,8,0),
+    ("2026-01-22",19,3,9,10,3,0),
+    ("2026-01-23",15,2,6,9,2,0),
+    ("2026-01-24",25,3,11,14,2,1),
+    ("2026-01-25",22,1,5,17,1,0),
+    ("2026-01-26",18,0,8,10,0,0),
+    ("2026-01-27",7,5,5,2,3,2),
+    ("2026-01-28",27,4,13,14,4,0),
+    ("2026-01-29",22,3,12,10,1,2),
+    ("2026-01-30",7,0,6,1,0,0),
+    ("2026-01-31",16,4,13,3,4,0),
+    ("2026-02-01",11,0,9,2,0,0),
+    ("2026-02-02",21,4,16,5,4,0),
+    ("2026-02-03",15,1,11,4,0,1),
+    ("2026-02-04",12,3,6,6,3,0),
+    ("2026-02-05",14,9,5,9,4,5),
+    ("2026-02-06",21,1,12,9,1,0),
+    ("2026-02-07",19,3,10,9,3,0),
+    ("2026-02-08",15,2,9,6,2,0),
+    ("2026-02-09",19,1,13,6,1,0),
+    ("2026-02-10",12,4,7,5,2,2),
+    ("2026-02-11",30,5,16,14,3,2),
+    ("2026-02-12",16,4,13,3,3,1),
+    ("2026-02-13",20,6,12,8,6,0),
+    ("2026-02-14",21,6,10,11,4,2),
+    ("2026-02-15",24,4,12,12,4,0),
+    ("2026-02-16",18,3,10,8,3,0),
+    ("2026-02-17",26,4,17,9,1,3),
+    ("2026-02-18",13,9,5,8,9,0),
+    ("2026-02-19",14,9,9,5,4,5),
+    ("2026-02-20",18,13,11,7,6,7),
+    ("2026-02-21",15,11,9,6,6,5),
+    ("2026-02-22",23,7,10,13,3,4),
+    ("2026-02-23",18,14,9,9,10,4),
+    ("2026-02-24",12,8,6,6,6,2),
+    ("2026-02-25",17,12,9,8,8,4),
+    ("2026-02-26",14,17,4,10,10,7),
+    ("2026-02-27",14,19,4,10,14,5),
+    ("2026-02-28",11,13,9,2,11,2),
+]
+df_notif = pd.DataFrame(
+    notif_data,
+    columns=[
+        "Date","Notifications_Received","Jobs_Without_Notification",
+        "Corrective_With_Notif","BD_With_Notif",
+        "Corrective_Without_Notif","BD_Without_Notif"
     ]
+)
+notif_totals = df_notif.iloc[:,1:].sum()
 
-    header_row = None
-    for i in range(len(df_raw)):
-        row_values = df_raw.iloc[i].astype(str).str.strip().tolist()
-        match_count = sum(1 for h in header_keywords if h in row_values)
-        if match_count >= 8:  # enough columns match
-            header_row = i
-            break
+# ============================================================
+# ROW 2 — Hour-wise + Machine-wise
+# ============================================================
+st.subheader("⏱ Hour-wise Breakdown & 🛠 Machine-wise Breakdown")
+col1, col2 = st.columns(2)
 
-    if header_row is None:
-        st.error("Could not detect header row in Excel file.")
-        st.stop()
+with col1:
+    fig2, ax2 = plt.subplots(figsize=(7,4))
+    ax2.bar(df_hour["Hour"], df_hour["Hours"],
+            color=plt.cm.turbo(df_hour["Hours"]/df_hour["Hours"].max()))
+    ax2.set_title("Hour-wise Breakdown (0–23)", fontsize=14)
+    ax2.set_xlabel("Hour of Day")
+    ax2.set_ylabel("Hours")
+    ax2.grid(axis="y", linestyle="--", alpha=0.4)
+    st.pyplot(fig2)
 
-    df = pd.read_excel(path, header=header_row)
-    return df
+with col2:
+    fig3, ax3 = plt.subplots(figsize=(7,4))
+    ax3.barh(df_machine["Machine"], df_machine["Hours"],
+             color=plt.cm.plasma(df_machine["Hours"]/df_machine["Hours"].max()))
+    ax3.set_title("Machine-wise Breakdown (Hours)", fontsize=14)
+    ax3.invert_yaxis()
+    ax3.grid(axis="x", linestyle="--", alpha=0.4)
+    st.pyplot(fig3)
 
+# ============================================================
+# ROW 3 — Area-wise + Machine Classification
+# ============================================================
+st.subheader("🏭 Area-wise Breakdown & ⚙ Machine Classification Breakdown")
+col3, col4 = st.columns(2)
 
-# ----------------- SAFE HELPERS -----------------
+with col3:
+    fig4, ax4 = plt.subplots(figsize=(7,4))
+    ax4.bar(df_area["Area"], df_area["Hours"],
+            color=plt.cm.viridis(df_area["Hours"]/df_area["Hours"].max()))
+    ax4.set_title("Area-wise Breakdown (Hours)", fontsize=14)
+    ax4.set_xticklabels(df_area["Area"], rotation=25, ha="right")
+    ax4.set_ylabel("Hours")
+    ax4.grid(axis="y", linestyle="--", alpha=0.4)
+    st.pyplot(fig4)
 
-def safe_col(df, col, default=""):
-    return df[col] if col in df.columns else pd.Series([default] * len(df))
-
-def safe_time(series):
-    if series.dtype in ["float64", "int64"]:
-        return pd.to_datetime(series, unit="D", origin="1899-12-30", errors="coerce")
-    return pd.to_datetime(series, errors="coerce")
-
-def safe_timedelta(series):
-    if series.dtype in ["float64", "int64"]:
-        return pd.to_timedelta(series, unit="D", errors="coerce").fillna(pd.Timedelta(0))
-    return pd.to_timedelta(series, errors="coerce").fillna(pd.Timedelta(0))
-
-
-# ----------------- CLEANING -----------------
-
-def clean_data(df):
-    df.columns = [c.strip() for c in df.columns]
-
-    df["Date"] = safe_time(safe_col(df, "Date"))
-    df["Requested Time"] = safe_time(safe_col(df, "Requested Time"))
-    df["Start"] = safe_time(safe_col(df, "Start"))
-    df["End"] = safe_time(safe_col(df, "End"))
-    df["Time Consumed"] = safe_timedelta(safe_col(df, "Time Consumed"))
-
-    df["Minutes"] = df["Time Consumed"].dt.total_seconds() / 60
-
-    df["Hour"] = df["Requested Time"].dt.hour
-    df["Hour"] = df["Hour"].fillna(df["Start"].dt.hour)
-    df["Hour"] = df["Hour"].fillna(0).astype(int)
-
-    # Skip incomplete rows
-    df = df[df["Date"].notna()]
-    df = df[df["Minutes"] >= 0]
-
-    return df
-
-
-# ----------------- TECHNICIAN SPLIT -----------------
-
-def explode_tech(df):
-    perf = safe_col(df, "Performed By").fillna("").astype(str)
-    perf = (
-        perf.str.replace(" and ", "/", case=False)
-        .str.replace("&", "/", case=False)
-        .str.replace(",", "/", case=False)
-    )
-    df["Tech_List"] = perf.str.split("/")
-    df2 = df.explode("Tech_List")
-    df2["Tech_List"] = df2["Tech_List"].astype(str).str.strip()
-    df2 = df2[df2["Tech_List"] != ""]
-    return df2
-
-
-# ----------------- LOAD DATA -----------------
-
-uploaded = st.file_uploader("Upload updated Excel", type=["xlsx", "xls"])
-
-if uploaded:
-    uploaded_df = load_real_data(uploaded)
-    uploaded_df.to_excel(DATA_PATH, index=False)
-    st.success("File saved permanently.")
-
-if not os.path.exists(DATA_PATH):
-    st.warning("No saved data found.")
-    st.stop()
-
-df = load_real_data(DATA_PATH)
-df = clean_data(df)
-df_tech = explode_tech(df.copy())
-
-
-# ----------------- MTD / YTD -----------------
-
-col1, col2, col3 = st.columns(3)
-mode = "ALL"
-
-if col1.button("MTD"):
-    mode = "MTD"
-if col2.button("YTD"):
-    mode = "YTD"
-if col3.button("ALL"):
-    mode = "ALL"
-
-today = datetime.today()
-
-if mode == "MTD":
-    df = df[df["Date"].dt.month == today.month]
-    df_tech = df_tech[df_tech["Date"].dt.month == today.month]
-
-if mode == "YTD":
-    df = df[df["Date"].dt.year == today.year]
-    df_tech = df_tech[df_tech["Date"].dt.year == today.year]
-
-
-# ----------------- FILTERS -----------------
-
-st.sidebar.header("Filters")
-
-machine_list = sorted(safe_col(df, "Machine No.").dropna().astype(str).unique())
-shift_list = sorted(safe_col(df, "Shift").dropna().astype(str).unique())
-job_list = sorted(safe_col(df, "Job").dropna().astype(str).unique())
-area_list = sorted(safe_col(df, "Machine Classification").dropna().astype(str).unique())
-tech_list = sorted(df_tech["Tech_List"].dropna().astype(str).unique())
-
-machine_filter = st.sidebar.multiselect("Machine", machine_list)
-shift_filter = st.sidebar.multiselect("Shift", shift_list)
-job_filter = st.sidebar.multiselect("Job", job_list)
-area_filter = st.sidebar.multiselect("Area", area_list)
-tech_filter = st.sidebar.multiselect("Technician", tech_list)
-
-df_view = df.copy()
-
-if machine_filter:
-    df_view = df_view[df_view["Machine No."].astype(str).isin(machine_filter)]
-if shift_filter:
-    df_view = df_view[df_view["Shift"].astype(str).isin(shift_filter)]
-if job_filter:
-    df_view = df_view[df_view["Job"].astype(str).isin(job_filter)]
-if area_filter:
-    df_view = df_view[df_view["Machine Classification"].astype(str).isin(area_filter)]
-
-df_tech_view = df_tech.copy()
-if tech_filter:
-    df_tech_view = df_tech_view[df_tech_view["Tech_List"].astype(str).isin(tech_filter)]
-
-
-# ----------------- DASHBOARDS -----------------
-
-tabs = st.tabs([
-    "Machine Breakdown",
-    "Technician Performance",
-    "Job Type",
-    "Spare Parts",
-    "Notifications",
-    "Remarks",
-    "Hourly Breakdown",
-    "Raw Data"
-])
-
-# ---------- Machine Breakdown ----------
-with tabs[0]:
-    col = safe_col(df_view, "Machine No.")
-    if col.empty:
-        st.info("No Machine No. data available.")
-    else:
-        freq = col.astype(str).value_counts().reset_index()
-        freq.columns = ["Machine No.", "Jobs"]
-        st.plotly_chart(px.bar(freq, x="Machine No.", y="Jobs"), use_container_width=True)
-
-# ---------- Technician Performance ----------
-with tabs[1]:
-    if df_tech_view.empty:
-        st.info("No technician data.")
-    else:
-        tech = df_tech_view.groupby("Tech_List")["Minutes"].sum().reset_index()
-        st.plotly_chart(px.bar(tech, x="Tech_List", y="Minutes"), use_container_width=True)
-
-        tech_date = df_tech_view.groupby(["Tech_List", "Date"])["Minutes"].sum().reset_index()
-        st.dataframe(tech_date, use_container_width=True)
-
-# ---------- Job Type ----------
-with tabs[2]:
-    col = safe_col(df_view, "Job")
-    if col.empty:
-        st.info("No Job data.")
-    else:
-        job_counts = col.value_counts().reset_index()
-        job_counts.columns = ["Job", "Count"]
-        st.plotly_chart(px.bar(job_counts, x="Job", y="Count"), use_container_width=True)
-
-# ---------- Spare Parts ----------
-with tabs[3]:
-    spare = safe_col(df_view, "Spare Part Used").fillna("").astype(str)
-    spare = spare[spare.str.strip() != ""]
-    if spare.empty:
-        st.info("No spare parts used.")
-    else:
-        spare_counts = spare.value_counts().reset_index()
-        spare_counts.columns = ["Spare Part", "Count"]
-        st.plotly_chart(px.bar(spare_counts, x="Spare Part", y="Count"), use_container_width=True)
-        st.dataframe(spare_counts)
-
-# ---------- Notifications ----------
-with tabs[4]:
-    if ("Machine No." in df_view.columns) and ("Notification No." in df_view.columns):
-        notif_mach = df_view.groupby("Machine No.")["Notification No."].nunique().reset_index()
-        notif_mach.columns = ["Machine No.", "Unique Notifications"]
-        st.plotly_chart(px.bar(notif_mach, x="Machine No.", y="Unique Notifications"), use_container_width=True)
-    else:
-        st.info("Notification or Machine No. missing.")
-
-# ---------- Remarks ----------
-with tabs[5]:
-    remarks = safe_col(df_view, "Remarks").astype(str)
-    remarks = remarks[remarks.str.strip() != ""]
-    if remarks.empty:
-        st.info("No remarks.")
-    else:
-        remarks_mach = df_view[df_view["Remarks"].astype(str).str.strip() != ""]["Machine No."].value_counts().reset_index()
-        remarks_mach.columns = ["Machine No.", "Remarks Count"]
-        st.plotly_chart(px.bar(remarks_mach, x="Machine No.", y="Remarks Count"), use_container_width=True)
-
-# ---------- Hourly Breakdown ----------
-with tabs[6]:
-    if ("Hour" in df_view.columns) and ("Machine No." in df_view.columns):
-        hour_jobs = df_view.groupby("Hour")["Machine No."].count().reset_index()
-        hour_jobs.columns = ["Hour", "Jobs"]
-        st.plotly_chart(px.bar(hour_jobs, x="Hour", y="Jobs"), use_container_width=True)
-    else:
-        st.info("Hour or Machine No. missing.")
-
-# ---------- Raw Data ----------
-with tabs[7]:
-    st.dataframe(df_view, use_container_width=True)
+with col4:
+    fig5, ax5 = plt.subplots(figsize=(7,6))
+    ax5.barh(df_class["Equipment"], df_class["Hours"],
+             color=plt.cm.cividis(df_class["Hours"]/df_class["Hours"].max()))
+    ax5.set_title("Machine Classification Breakdown (Hours)", fontsize=
